@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api/client';
 import toast from 'react-hot-toast';
 import {
-    Mail, Plus, Trash2, Activity, Shield, Code, Copy, Check, ChevronDown, ChevronUp, ExternalLink, Zap
+    Mail, Plus, Trash2, Activity, Shield, Code, Copy, Check, ChevronDown, ChevronUp,
+    ExternalLink, Zap, Loader2, Chrome
 } from 'lucide-react';
 
 const GOOGLE_APPS_SCRIPT_CODE = `function doPost(e) {
@@ -33,7 +35,7 @@ const GOOGLE_APPS_SCRIPT_CODE = `function doPost(e) {
     
     // Threaded follow-up reply
     if (data.action === 'reply') {
-      var subject = (data.originalSubject || '').replace(/^Re:\\s*/i, '');
+      var subject = (data.originalSubject || '').replace(/^Re:\\\\s*/i, '');
       var threads = GmailApp.search('to:' + data.to + ' subject:"' + subject + '" in:sent', 0, 1);
       
       if (threads.length > 0) {
@@ -79,12 +81,14 @@ function doGet(e) {
 }`;
 
 export default function Accounts() {
+    const [searchParams, setSearchParams] = useSearchParams();
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showScript, setShowScript] = useState(false);
     const [showConnect, setShowConnect] = useState(false);
     const [copied, setCopied] = useState(false);
     const [connecting, setConnecting] = useState(false);
+    const [oauthLoading, setOauthLoading] = useState(false);
     const [form, setForm] = useState({ email: '', displayName: '', scriptUrl: '' });
 
     const fetchAccounts = () => {
@@ -97,7 +101,34 @@ export default function Accounts() {
 
     useEffect(() => {
         fetchAccounts();
+
+        // Handle OAuth callback params
+        if (searchParams.get('connected') === 'true') {
+            const email = searchParams.get('email');
+            toast.success(`Gmail connected: ${email || 'Success!'} 🎉`);
+            searchParams.delete('connected');
+            searchParams.delete('email');
+            setSearchParams(searchParams, { replace: true });
+        }
+        if (searchParams.get('error')) {
+            toast.error('Gmail connection failed. Please try again.');
+            searchParams.delete('error');
+            setSearchParams(searchParams, { replace: true });
+        }
     }, []);
+
+    const connectOAuth = async () => {
+        setOauthLoading(true);
+        try {
+            const res = await api.get('/accounts/oauth/connect');
+            if (res.data.url) {
+                window.location.href = res.data.url;
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to start Gmail connection');
+            setOauthLoading(false);
+        }
+    };
 
     const copyScript = async () => {
         try {
@@ -158,14 +189,39 @@ export default function Accounts() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-surface-900 dark:text-white">Gmail Accounts</h1>
-                    <p className="text-surface-500 mt-1">Manage your connected Gmail accounts via Google Apps Script</p>
+                    <p className="text-surface-500 mt-1">Connect your Gmail to start sending emails</p>
                 </div>
-                <button onClick={() => setShowConnect(!showConnect)} className="btn-primary" id="connect-gmail-btn">
-                    <Plus className="w-4 h-4" /> Connect Gmail
-                </button>
             </div>
 
-            {/* Google Apps Script Section */}
+            {/* One-Click OAuth Connection */}
+            <div className="glass-card p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-500/5 dark:to-indigo-500/5">
+                <div className="flex flex-col md:flex-row items-center gap-6">
+                    <div className="w-16 h-16 rounded-2xl bg-white dark:bg-surface-800 shadow-lg flex items-center justify-center flex-shrink-0">
+                        <svg viewBox="0 0 24 24" className="w-9 h-9">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                        </svg>
+                    </div>
+                    <div className="flex-1 text-center md:text-left">
+                        <h3 className="text-xl font-bold text-surface-900 dark:text-white mb-1">Connect with Gmail</h3>
+                        <p className="text-sm text-surface-500">One click to connect. No setup required. Securely authorized via Google OAuth2.</p>
+                    </div>
+                    <button
+                        onClick={connectOAuth}
+                        disabled={oauthLoading}
+                        className="btn-primary !py-3 !px-8 text-base shadow-xl shadow-primary-500/20 hover:shadow-2xl transition-all flex-shrink-0"
+                    >
+                        {oauthLoading
+                            ? <><Loader2 className="w-5 h-5 animate-spin" /> Connecting...</>
+                            : <><Chrome className="w-5 h-5" /> Connect Gmail</>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            {/* Alternative: Google Apps Script (collapsed) */}
             <div className="glass-card overflow-hidden">
                 <button
                     onClick={() => setShowScript(!showScript)}
@@ -176,8 +232,8 @@ export default function Accounts() {
                             <Code className="w-5 h-5 text-white" />
                         </div>
                         <div className="text-left">
-                            <div className="font-semibold text-surface-900 dark:text-white">Google Apps Script</div>
-                            <div className="text-xs text-surface-500">Copy this script and deploy it in your Google account</div>
+                            <div className="font-semibold text-surface-900 dark:text-white">Alternative: Google Apps Script</div>
+                            <div className="text-xs text-surface-500">Advanced option — manually deploy a script (optional)</div>
                         </div>
                     </div>
                     {showScript ? <ChevronUp className="w-5 h-5 text-surface-400" /> : <ChevronDown className="w-5 h-5 text-surface-400" />}
@@ -221,87 +277,39 @@ export default function Accounts() {
                                 <code>{GOOGLE_APPS_SCRIPT_CODE}</code>
                             </pre>
                         </div>
+
+                        {/* Connection Form */}
+                        <div className="p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50">
+                            <h4 className="text-sm font-semibold text-surface-900 dark:text-white mb-3 flex items-center gap-2">
+                                <Mail className="w-4 h-4 text-primary-500" /> Connect via Script URL
+                            </h4>
+                            <form onSubmit={connectGmail} className="space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <input type="email" placeholder="your.email@gmail.com" value={form.email}
+                                        onChange={e => setForm({ ...form, email: e.target.value })} className="input" required />
+                                    <input type="text" placeholder="Display Name" value={form.displayName}
+                                        onChange={e => setForm({ ...form, displayName: e.target.value })} className="input" />
+                                </div>
+                                <input type="url" placeholder="https://script.google.com/macros/s/AKfyc.../exec"
+                                    value={form.scriptUrl} onChange={e => setForm({ ...form, scriptUrl: e.target.value })}
+                                    className="input" required />
+                                <div className="flex items-center gap-3">
+                                    <button type="submit" disabled={connecting} className="btn-primary text-sm">
+                                        {connecting ? <><Loader2 className="w-4 h-4 animate-spin" /> Connecting...</> : <><Zap className="w-4 h-4" /> Connect</>}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 )}
             </div>
 
-            {/* Connection Form */}
-            {showConnect && (
-                <div className="glass-card p-6">
-                    <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
-                        <Mail className="w-5 h-5 text-primary-500" /> Connect Gmail Account
-                    </h3>
-                    <form onSubmit={connectGmail} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-sm font-medium text-surface-700 dark:text-surface-300 block mb-1.5">
-                                    Gmail Address <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="email"
-                                    placeholder="your.email@gmail.com"
-                                    value={form.email}
-                                    onChange={e => setForm({ ...form, email: e.target.value })}
-                                    className="input"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-surface-700 dark:text-surface-300 block mb-1.5">
-                                    Display Name
-                                </label>
-                                <input
-                                    type="text"
-                                    placeholder="Your Name"
-                                    value={form.displayName}
-                                    onChange={e => setForm({ ...form, displayName: e.target.value })}
-                                    className="input"
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium text-surface-700 dark:text-surface-300 block mb-1.5">
-                                Google Apps Script Web App URL <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="url"
-                                placeholder="https://script.google.com/macros/s/AKfyc.../exec"
-                                value={form.scriptUrl}
-                                onChange={e => setForm({ ...form, scriptUrl: e.target.value })}
-                                className="input"
-                                required
-                            />
-                            <p className="text-xs text-surface-400 mt-1">Paste the Web App URL from your deployed Google Apps Script</p>
-                        </div>
-                        <div className="flex items-center gap-3 pt-2">
-                            <button
-                                type="submit"
-                                disabled={connecting}
-                                className="btn-primary"
-                            >
-                                {connecting ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        Testing & Connecting...
-                                    </>
-                                ) : (
-                                    <><Zap className="w-4 h-4" /> Connect Account</>
-                                )}
-                            </button>
-                            <button type="button" onClick={() => setShowConnect(false)} className="btn-secondary">
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
             {/* Info card */}
-            <div className="glass-card p-5 flex items-start gap-3 bg-gradient-to-r from-primary-50 to-accent-50 dark:from-primary-500/5 dark:to-accent-500/5">
-                <Shield className="w-5 h-5 text-primary-500 mt-0.5 flex-shrink-0" />
+            <div className="glass-card p-5 flex items-start gap-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-500/5 dark:to-emerald-500/5">
+                <Shield className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-surface-700 dark:text-surface-300">
-                    <p className="font-medium mb-1">Google Apps Script Security</p>
-                    <p className="text-surface-500 text-xs">Emails are sent directly from your Google account via Apps Script. No OAuth client credentials are needed — the script runs with your own Google permissions. Your script URL is stored securely.</p>
+                    <p className="font-medium mb-1">Your Gmail is Secure</p>
+                    <p className="text-surface-500 text-xs">We use Google's official OAuth2 protocol. Your password is never shared. Emails are sent directly via the Gmail API. You can revoke access anytime from your Google Account settings.</p>
                 </div>
             </div>
 
@@ -311,9 +319,9 @@ export default function Accounts() {
                 <div className="text-center py-16 glass-card">
                     <Mail className="w-12 h-12 text-surface-300 mx-auto mb-3" />
                     <h3 className="text-lg font-semibold text-surface-700 dark:text-surface-300">No Gmail accounts connected</h3>
-                    <p className="text-surface-400 mt-1 mb-4">Deploy the Google Apps Script above, then connect your Gmail account</p>
-                    <button onClick={() => { setShowConnect(true); setShowScript(true); }} className="btn-primary">
-                        <Plus className="w-4 h-4" /> Get Started
+                    <p className="text-surface-400 mt-1 mb-4">Click "Connect Gmail" above to get started in seconds</p>
+                    <button onClick={connectOAuth} className="btn-primary">
+                        <Chrome className="w-4 h-4" /> Connect Gmail
                     </button>
                 </div>
             ) : (
@@ -327,7 +335,9 @@ export default function Accounts() {
                                     </div>
                                     <div>
                                         <div className="font-semibold text-surface-900 dark:text-white">{a.email}</div>
-                                        <div className="text-xs text-surface-400">{a.displayName || 'Gmail Account'} • via Google Apps Script</div>
+                                        <div className="text-xs text-surface-400">
+                                            {a.displayName || 'Gmail Account'} • via {a.connectionType === 'oauth' ? '🔑 Google OAuth' : '📜 Apps Script'}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">

@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { sendViaScript } from './gmailScript.js';
+import { sendViaOAuth } from './gmailOAuth.js';
 import { replaceMergeTags } from '../utils/mergetags.js';
 import EmailLog from '../models/EmailLog.js';
 import env from '../config/env.js';
@@ -62,16 +63,30 @@ export const sendEmail = async (account, { to, subject, htmlBody, plainBody, con
     await emailLog.save();
 
     try {
-        // Send via Google Apps Script
-        const result = await sendViaScript(account.scriptUrl, {
-            to,
-            subject: mergedSubject,
-            htmlBody: mergedHtml,
-            plainBody: mergedPlain,
-            cc,
-            bcc,
-            displayName: account.displayName || account.email,
-        });
+        let result;
+
+        // Send via the appropriate method based on connection type
+        if (account.connectionType === 'oauth') {
+            result = await sendViaOAuth(account, {
+                to,
+                subject: mergedSubject,
+                htmlBody: mergedHtml,
+                plainBody: mergedPlain,
+                cc,
+                bcc,
+                displayName: account.displayName || account.email,
+            });
+        } else {
+            result = await sendViaScript(account.scriptUrl, {
+                to,
+                subject: mergedSubject,
+                htmlBody: mergedHtml,
+                plainBody: mergedPlain,
+                cc,
+                bcc,
+                displayName: account.displayName || account.email,
+            });
+        }
 
         // Update log
         emailLog.status = 'sent';

@@ -24,6 +24,10 @@ const env = {
     STRIPE_PRICE_STARTER: process.env.STRIPE_PRICE_STARTER || '',
     STRIPE_PRICE_GROWTH: process.env.STRIPE_PRICE_GROWTH || '',
     STRIPE_PRICE_PRO: process.env.STRIPE_PRICE_PRO || '',
+    // Google OAuth2
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
+    GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI || '',
 };
 
 export default env;

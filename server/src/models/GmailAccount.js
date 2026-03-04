@@ -14,12 +14,17 @@ const gmailAccountSchema = new mongoose.Schema({
     displayName: String,
     scriptUrl: {
         type: String,
-        required: true,
+        default: '',
     },
     connectionType: {
         type: String,
+        enum: ['script', 'oauth'],
         default: 'script',
     },
+    // OAuth2 tokens (encrypted at rest)
+    accessToken: { type: String, default: '' },
+    refreshToken: { type: String, default: '' },
+    tokenExpiresAt: { type: Date },
     dailySentCount: {
         type: Number,
         default: 0,

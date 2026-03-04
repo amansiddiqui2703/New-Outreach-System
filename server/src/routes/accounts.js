@@ -2,8 +2,70 @@ import { Router } from 'express';
 import auth from '../middleware/auth.js';
 import GmailAccount from '../models/GmailAccount.js';
 import { testScriptConnection } from '../services/gmailScript.js';
+import { getAuthUrl, getTokensFromCode, getGmailProfile } from '../services/gmailOAuth.js';
+import env from '../config/env.js';
 
 const router = Router();
+
+// Generate Google OAuth2 authorization URL
+router.get('/oauth/connect', auth, async (req, res) => {
+    try {
+        if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+            return res.status(500).json({ error: 'Google OAuth is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env' });
+        }
+        const url = getAuthUrl(req.user.id);
+        res.json({ url });
+    } catch (error) {
+        console.error('OAuth connect error:', error);
+        res.status(500).json({ error: 'Failed to start Gmail connection' });
+    }
+});
+
+// Google OAuth2 callback (user is redirected here by Google)
+router.get('/oauth/callback', async (req, res) => {
+    try {
+        const { code, state: userId } = req.query;
+        if (!code || !userId) {
+            return res.redirect(`${env.APP_URL}/accounts?error=missing_params`);
+        }
+
+        // Exchange code for tokens
+        const tokens = await getTokensFromCode(code);
+
+        // Get the user's Gmail profile
+        const profile = await getGmailProfile(tokens.access_token);
+
+        // Save or update the Gmail account
+        const existing = await GmailAccount.findOne({ userId, email: profile.email.toLowerCase() });
+
+        if (existing) {
+            existing.accessToken = tokens.access_token;
+            existing.refreshToken = tokens.refresh_token || existing.refreshToken;
+            existing.tokenExpiresAt = tokens.expiry_date ? new Date(tokens.expiry_date) : null;
+            existing.connectionType = 'oauth';
+            existing.displayName = profile.name || existing.displayName;
+            existing.isActive = true;
+            existing.health = 'good';
+            await existing.save();
+        } else {
+            await GmailAccount.create({
+                userId,
+                email: profile.email.toLowerCase(),
+                displayName: profile.name || profile.email,
+                connectionType: 'oauth',
+                accessToken: tokens.access_token,
+                refreshToken: tokens.refresh_token,
+                tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+            });
+        }
+
+        // Redirect back to the app
+        res.redirect(`${env.APP_URL}/accounts?connected=true&email=${encodeURIComponent(profile.email)}`);
+    } catch (error) {
+        console.error('OAuth callback error:', error);
+        res.redirect(`${env.APP_URL}/accounts?error=connection_failed`);
+    }
+});
 
 // Connect Gmail via Google Apps Script
 router.post('/connect-script', auth, async (req, res) => {

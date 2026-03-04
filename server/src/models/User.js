@@ -29,6 +29,14 @@ const userSchema = new mongoose.Schema({
         defaultDailyLimit: { type: Number, default: 200 },
         timezone: { type: String, default: 'UTC' },
     },
+    plan: {
+        type: String,
+        enum: ['free', 'starter', 'growth', 'pro'],
+        default: 'free',
+    },
+    stripeCustomerId: { type: String, default: '' },
+    stripeSubscriptionId: { type: String, default: '' },
+    planExpiresAt: { type: Date },
 }, {
     timestamps: true,
 });

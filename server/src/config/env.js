@@ -18,6 +18,12 @@ const env = {
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     APP_URL: process.env.APP_URL || 'http://localhost:5173',
     SERVER_URL: process.env.SERVER_URL || 'http://localhost:5000',
+    // Stripe
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+    STRIPE_PRICE_STARTER: process.env.STRIPE_PRICE_STARTER || '',
+    STRIPE_PRICE_GROWTH: process.env.STRIPE_PRICE_GROWTH || '',
+    STRIPE_PRICE_PRO: process.env.STRIPE_PRICE_PRO || '',
 };
 
 export default env;

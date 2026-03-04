@@ -1,0 +1,40 @@
+import User from '../models/User.js';
+
+/**
+ * Plan limits configuration
+ */
+const PLAN_LIMITS = {
+    free: { emailsPerDay: 50, contacts: 200, accounts: 1, ai: false, followUpSteps: 0 },
+    starter: { emailsPerDay: 200, contacts: 2000, accounts: 2, ai: 'basic', followUpSteps: 2 },
+    growth: { emailsPerDay: 1000, contacts: 10000, accounts: 5, ai: 'full', followUpSteps: 5 },
+    pro: { emailsPerDay: 5000, contacts: 50000, accounts: 15, ai: 'full', followUpSteps: 999 },
+};
+
+export { PLAN_LIMITS };
+
+/**
+ * Middleware to attach plan limits to request
+ */
+const planLimits = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.user.id).select('plan planExpiresAt').lean();
+        if (!user) return res.status(401).json({ error: 'User not found' });
+
+        let plan = user.plan || 'free';
+
+        // Check if paid plan has expired
+        if (plan !== 'free' && user.planExpiresAt && new Date(user.planExpiresAt) < new Date()) {
+            plan = 'free';
+            await User.findByIdAndUpdate(req.user.id, { plan: 'free' });
+        }
+
+        req.plan = plan;
+        req.planLimits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+        next();
+    } catch (error) {
+        console.error('Plan limits middleware error:', error);
+        next();
+    }
+};
+
+export default planLimits;

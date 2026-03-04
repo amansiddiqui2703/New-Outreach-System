@@ -26,6 +26,8 @@ import trackingRoutes from './routes/tracking.js';
 import templateRoutes from './routes/templates.js';
 import followupRoutes from './routes/followups.js';
 import chatbotRoutes from './routes/chatbot.js';
+import billingRoutes from './routes/billing.js';
+import { handleStripeWebhook } from './services/stripeWebhook.js';
 
 // Tracking & unsubscribe (public)
 import { recordUnsubscribe } from './services/tracking.js';
@@ -34,6 +36,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
+
+// Stripe webhook needs raw body — must come BEFORE express.json()
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 
 // Middleware
 app.use(cors({ origin: env.APP_URL, credentials: true }));
@@ -60,6 +65,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/followups', followupRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/billing', billingRoutes);
 
 // Tracking routes (public, no auth)
 app.use('/t', trackingRoutes);

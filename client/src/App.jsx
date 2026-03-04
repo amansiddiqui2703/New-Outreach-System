@@ -15,6 +15,8 @@ import Analytics from './pages/Analytics';
 import Accounts from './pages/Accounts';
 import Settings from './pages/Settings';
 import FollowUps from './pages/FollowUps';
+import Billing from './pages/Billing';
+import Landing from './pages/Landing';
 
 export default function App() {
   return (
@@ -35,7 +37,9 @@ export default function App() {
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/accounts" element={<Accounts />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/billing" element={<Billing />} />
             </Route>
+            <Route path="/landing" element={<Landing />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

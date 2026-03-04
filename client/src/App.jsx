@@ -14,6 +14,7 @@ import EmailFinder from './pages/EmailFinder';
 import Analytics from './pages/Analytics';
 import Accounts from './pages/Accounts';
 import Settings from './pages/Settings';
+import FollowUps from './pages/FollowUps';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/campaigns" element={<Campaigns />} />
               <Route path="/compose" element={<Compose />} />
+              <Route path="/followups" element={<FollowUps />} />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/contacts/:id" element={<ContactDetail />} />
               <Route path="/finder" element={<EmailFinder />} />

@@ -11,6 +11,7 @@ import connectDB from './config/db.js';
 import { connectRedis } from './config/redis.js';
 import { initQueue } from './services/queue.js';
 import { apiLimiter } from './middleware/rateLimit.js';
+import { startFollowUpScheduler } from './services/followUpScheduler.js';
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -23,6 +24,7 @@ import aiRoutes from './routes/ai.js';
 import analyticsRoutes from './routes/analytics.js';
 import trackingRoutes from './routes/tracking.js';
 import templateRoutes from './routes/templates.js';
+import followupRoutes from './routes/followups.js';
 
 // Tracking & unsubscribe (public)
 import { recordUnsubscribe } from './services/tracking.js';
@@ -55,6 +57,7 @@ app.use('/api/finder', finderRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/templates', templateRoutes);
+app.use('/api/followups', followupRoutes);
 
 // Tracking routes (public, no auth)
 app.use('/t', trackingRoutes);
@@ -122,6 +125,7 @@ const start = async () => {
   await connectDB();
   connectRedis();
   initQueue();
+  startFollowUpScheduler();
 
   app.listen(env.PORT, () => {
     console.log(`\n🚀 AutoMindz server running on port ${env.PORT}`);

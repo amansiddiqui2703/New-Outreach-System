@@ -3,7 +3,6 @@ import EmailLog from '../models/EmailLog.js';
 import Campaign from '../models/Campaign.js';
 import Contact from '../models/Contact.js';
 import TrackingEvent from '../models/TrackingEvent.js';
-import FollowUpSequence from '../models/FollowUpSequence.js';
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
@@ -48,12 +47,16 @@ const gatherUserData = async (userId) => {
     // --- Contacts ---
     const totalContacts = await Contact.countDocuments({ userId });
 
-    // --- Follow-up sequences ---
-    const [activeSequences, completedSequences, replyStoppedSequences] = await Promise.all([
-        FollowUpSequence.countDocuments({ userId, status: 'active' }),
-        FollowUpSequence.countDocuments({ userId, status: 'completed' }),
-        FollowUpSequence.countDocuments({ userId, status: 'stopped_reply' }),
-    ]);
+    // --- Follow-up sequence stats (from Campaign recipients) ---
+    const campaignsWithSequences = await Campaign.find({ userId, 'followUps.0': { $exists: true } }).lean();
+    let activeSequences = 0, completedSequences = 0, replyStoppedSequences = 0;
+    for (const c of campaignsWithSequences) {
+        for (const r of c.recipients || []) {
+            if (r.sequenceStatus === 'active') activeSequences++;
+            else if (r.sequenceStatus === 'completed') completedSequences++;
+            else if (r.sequenceStatus === 'stopped_reply') replyStoppedSequences++;
+        }
+    }
 
     // --- Recent replies (last 5) ---
     let recentReplies = [];

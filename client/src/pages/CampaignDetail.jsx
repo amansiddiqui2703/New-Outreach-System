@@ -686,12 +686,31 @@ export default function CampaignDetail() {
                         {/* Add recipients panel */}
                         {showAddRecipients && (
                             <div className="mb-4 p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl border border-surface-200 dark:border-surface-700 animate-in">
-                                <input value={recipientSearch} onChange={e => setRecipientSearch(e.target.value)}
-                                    className="input mb-3" placeholder="Search contacts by name or email..." autoFocus />
+                                <div className="flex items-center gap-2 mb-3">
+                                    <input value={recipientSearch} onChange={e => setRecipientSearch(e.target.value)}
+                                        className="input flex-1" placeholder="Search contacts by name or email..." autoFocus />
+                                    {filteredContacts.length > 0 && (
+                                        <button onClick={() => {
+                                            const newRecipients = filteredContacts.map(c => ({
+                                                contactId: c._id,
+                                                email: c.email,
+                                                name: c.name || '',
+                                                company: c.company || '',
+                                                status: 'pending',
+                                            }));
+                                            setRecipients([...recipients, ...newRecipients]);
+                                            toast.success(`${newRecipients.length} contacts added!`);
+                                            setShowAddRecipients(false);
+                                            setRecipientSearch('');
+                                        }} className="btn-secondary !py-2 whitespace-nowrap">
+                                            <Users className="w-4 h-4" /> Add All ({filteredContacts.length})
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="max-h-48 overflow-y-auto space-y-1">
                                     {filteredContacts.length === 0 ? (
                                         <p className="text-sm text-surface-400 text-center py-3">No contacts found</p>
-                                    ) : filteredContacts.slice(0, 20).map(c => (
+                                    ) : filteredContacts.slice(0, 50).map(c => (
                                         <button key={c._id} onClick={() => addRecipient(c)}
                                             className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 transition-all text-left">
                                             <div>
@@ -701,6 +720,11 @@ export default function CampaignDetail() {
                                             <Plus className="w-4 h-4 text-primary-500" />
                                         </button>
                                     ))}
+                                    {filteredContacts.length > 50 && (
+                                        <p className="text-xs text-surface-400 text-center py-1">
+                                            Showing 50 of {filteredContacts.length} — use search to narrow down, or click "Add All"
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         )}

@@ -34,6 +34,29 @@ router.get('/', auth, async (req, res) => {
     }
 });
 
+// Export CSV (must be before /:id to avoid route shadowing)
+router.get('/export', auth, async (req, res) => {
+    try {
+        const contacts = await Contact.find({ userId: req.user.id }).lean();
+        const csvData = contacts.map(c => ({
+            email: c.email,
+            name: c.name,
+            company: c.company,
+            source: c.source,
+            tags: (c.tags || []).join(';'),
+        }));
+
+        const headers = 'email,name,company,source,tags\n';
+        const rows = csvData.map(c => `${c.email},${c.name},${c.company},${c.source},${c.tags}`).join('\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename=contacts.csv');
+        res.send(headers + rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to export contacts' });
+    }
+});
+
 // Create contact
 router.post('/', auth, async (req, res) => {
     try {
@@ -223,29 +246,6 @@ router.delete('/:id', auth, async (req, res) => {
         res.json({ message: 'Contact permanently deleted (GDPR)' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete contact' });
-    }
-});
-
-// Export CSV
-router.get('/export', auth, async (req, res) => {
-    try {
-        const contacts = await Contact.find({ userId: req.user.id }).lean();
-        const csvData = contacts.map(c => ({
-            email: c.email,
-            name: c.name,
-            company: c.company,
-            source: c.source,
-            tags: (c.tags || []).join(';'),
-        }));
-
-        const headers = 'email,name,company,source,tags\n';
-        const rows = csvData.map(c => `${c.email},${c.name},${c.company},${c.source},${c.tags}`).join('\n');
-
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', 'attachment; filename=contacts.csv');
-        res.send(headers + rows);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to export contacts' });
     }
 });
 

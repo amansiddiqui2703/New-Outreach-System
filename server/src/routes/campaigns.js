@@ -88,8 +88,18 @@ router.post('/:id/duplicate', auth, async (req, res) => {
             createdAt: undefined,
             updatedAt: undefined,
         });
-        // Reset recipient statuses
-        duplicate.recipients = duplicate.recipients.map(r => ({ ...r, status: 'pending', sentAt: null }));
+        // Reset recipient statuses and sequence fields
+        duplicate.recipients = duplicate.recipients.map(r => ({
+            ...r,
+            status: 'pending',
+            sentAt: null,
+            openedAt: null,
+            clickedAt: null,
+            repliedAt: null,
+            currentStep: 0,
+            nextFollowUpAt: null,
+            sequenceStatus: 'active',
+        }));
         await duplicate.save();
         res.status(201).json({ campaign: duplicate });
     } catch (error) {

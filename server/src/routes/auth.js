@@ -35,8 +35,9 @@ router.post('/register', authLimiter, [
         }
 
         const verificationToken = crypto.randomBytes(32).toString('hex');
-        const count = await User.countDocuments();
-        const role = count === 0 ? 'admin' : 'user';
+
+        // Only assign 'admin' role to YOUR specific email address
+        const role = email.toLowerCase() === 'your.email@example.com' ? 'admin' : 'user';
 
         const user = new User({ email, password, name, verificationToken, role });
         await user.save();

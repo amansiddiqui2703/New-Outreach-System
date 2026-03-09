@@ -35,8 +35,10 @@ router.post('/register', authLimiter, [
         }
 
         const verificationToken = crypto.randomBytes(32).toString('hex');
+        const count = await User.countDocuments();
+        const role = count === 0 ? 'admin' : 'user';
 
-        const user = new User({ email, password, name, verificationToken });
+        const user = new User({ email, password, name, verificationToken, role });
         await user.save();
 
         const verifyUrl = `${env.APP_URL}/verify/${verificationToken}`;

@@ -69,7 +69,7 @@ export const sendViaScript = async (scriptUrl, { to, subject, htmlBody, plainBod
  * Send a threaded follow-up reply via Google Apps Script
  * This will search for the original email thread and reply in it
  */
-export const replyViaScript = async (scriptUrl, { to, originalSubject, htmlBody, plainBody, displayName }) => {
+export const replyViaScript = async (scriptUrl, { to, originalSubject, htmlBody, plainBody, displayName, previousMessageId }) => {
     try {
         const payload = {
             action: 'reply',
@@ -78,6 +78,7 @@ export const replyViaScript = async (scriptUrl, { to, originalSubject, htmlBody,
             htmlBody,
             plainBody: plainBody || '',
             name: displayName || '',
+            previousMessageId,
         };
 
         const response = await fetch(scriptUrl, {

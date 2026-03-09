@@ -214,6 +214,16 @@ const processRecipientFollowUp = async (campaign, recipient) => {
         });
         await followUpLog.save();
 
+        // Find the previous message ID for threading
+        const previousLog = await EmailLog.findOne({
+            campaignId: campaign._id,
+            to: recipient.email.toLowerCase(),
+            status: 'sent',
+            messageId: { $ne: null }
+        }).sort({ createdAt: -1 });
+
+        const previousMessageId = previousLog ? previousLog.messageId : null;
+
         // 8. Send threaded reply via appropriate method
         let result;
         const sendPayload = {
@@ -222,6 +232,7 @@ const processRecipientFollowUp = async (campaign, recipient) => {
             htmlBody: mergedHtml,
             plainBody,
             displayName: account.displayName || account.email,
+            previousMessageId,
         };
 
         if (account.connectionType === 'oauth') {

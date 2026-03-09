@@ -2,15 +2,15 @@
 title AutoMindz Stop Script
 
 echo =========================================
-echo       Stopping AutoMindz Servers...
+echo       Shutting Down AutoMindz...
 echo =========================================
-echo.
-echo Stopping all Node.js instances...
-taskkill /F /IM node.exe >nul 2>&1
+echo Safely stopping containers and preserving your data in MongoDB.
+
+docker-compose down
 
 echo.
 echo =========================================
-echo    Successfully stopped all servers!
-echo    You can now close this window.
+echo       AutoMindz has been stopped!
 echo =========================================
-timeout /t 3 >nul
+echo All your data has been saved to the MongoDB volume.
+pause

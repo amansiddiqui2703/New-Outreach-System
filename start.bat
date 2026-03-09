@@ -2,30 +2,43 @@
 title AutoMindz Start Script
 
 echo =========================================
-echo       Cleaning up old processes...
+echo       Checking Docker Installation
 echo =========================================
-:: Quietly kill any stuck Node.js servers to prevent port in-use errors
-taskkill /F /IM node.exe >nul 2>&1
+docker --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Docker is not installed or not running.
+    echo Please install Docker Desktop for Windows: https://docs.docker.com/desktop/install/windows-install/
+    echo Make sure Docker Desktop is open and running before launching AutoMindz.
+    echo.
+    pause
+    exit /b 1
+)
 
 echo.
 echo =========================================
-echo       Starting Backend Server...
+echo       Starting AutoMindz Environment
 echo =========================================
-:: Open a new window and start the backend
-cd "%~dp0server"
-start "AutoMindz Backend" cmd /k "npm run dev"
+echo This may take a few minutes the first time it runs to download the images.
+echo Your data will be safely persisted in MongoDB.
+
+:: Run docker-compose in detached mode and rebuild if necessary
+docker-compose up -d --build
+
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Failed to start Docker containers.
+    echo Check the error messages above.
+    pause
+    exit /b 1
+)
 
 echo.
 echo =========================================
-echo       Starting Frontend Server...
+echo       AutoMindz is running!
 echo =========================================
-:: Open another new window and start the frontend
-cd "%~dp0client"
-start "AutoMindz Frontend" cmd /k "npm run dev"
-
+echo Frontend: http://localhost:5173
+echo Backend API:  http://localhost:5000/api
 echo.
-echo =========================================
-echo    Both servers are starting up!
-echo    You can now close this window.
-echo =========================================
-timeout /t 5 >nul
+echo To shut down the application without losing data, run stop.bat!
+echo.
+pause

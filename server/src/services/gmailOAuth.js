@@ -132,30 +132,54 @@ export const sendViaOAuth = async (account, { to, subject, htmlBody, plainBody, 
 /**
  * Send a threaded reply via Gmail API using OAuth2.
  */
-export const replyViaOAuth = async (account, { to, originalSubject, htmlBody, plainBody, displayName }) => {
+export const replyViaOAuth = async (account, { to, originalSubject, htmlBody, plainBody, displayName, previousMessageId }) => {
     const oauth2Client = await getAuthenticatedClient(account);
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
-    // Search for the original thread
-    const cleanSubject = originalSubject.replace(/^Re:\s*/i, '');
-    const searchResult = await gmail.users.messages.list({
-        userId: 'me',
-        q: `to:${to} subject:"${cleanSubject}" in:sent`,
-        maxResults: 1,
-    });
-
     let threadId = null;
     let inReplyTo = null;
-    if (searchResult.data.messages?.length > 0) {
-        const msg = await gmail.users.messages.get({
-            userId: 'me',
-            id: searchResult.data.messages[0].id,
-            format: 'metadata',
-            metadataHeaders: ['Message-ID'],
-        });
-        threadId = msg.data.threadId;
-        const msgIdHeader = msg.data.payload?.headers?.find(h => h.name === 'Message-ID');
-        if (msgIdHeader) inReplyTo = msgIdHeader.value;
+    const cleanSubject = originalSubject.replace(/^Re:\s*/i, '');
+
+    // 1. If we have the exact messageId of the previous email, fetch it directly
+    if (previousMessageId) {
+        try {
+            const msg = await gmail.users.messages.get({
+                userId: 'me',
+                id: previousMessageId,
+                format: 'metadata',
+                metadataHeaders: ['Message-ID'],
+            });
+            threadId = msg.data.threadId;
+            const msgIdHeader = msg.data.payload?.headers?.find(h => h.name === 'Message-ID');
+            if (msgIdHeader) inReplyTo = msgIdHeader.value;
+        } catch (err) {
+            console.warn(`Could not find previous message by ID ${previousMessageId}:`, err.message);
+        }
+    }
+
+    // 2. Fallback: Search for the original thread by subject if previousMessageId failed/missing
+    if (!threadId) {
+        try {
+            const searchResult = await gmail.users.messages.list({
+                userId: 'me',
+                q: `to:${to} subject:"${cleanSubject}" in:sent`,
+                maxResults: 1,
+            });
+
+            if (searchResult.data.messages?.length > 0) {
+                const msg = await gmail.users.messages.get({
+                    userId: 'me',
+                    id: searchResult.data.messages[0].id,
+                    format: 'metadata',
+                    metadataHeaders: ['Message-ID'],
+                });
+                threadId = msg.data.threadId;
+                const msgIdHeader = msg.data.payload?.headers?.find(h => h.name === 'Message-ID');
+                if (msgIdHeader) inReplyTo = msgIdHeader.value;
+            }
+        } catch (err) {
+            console.warn(`Thread search by subject failed:`, err.message);
+        }
     }
 
     // Build MIME

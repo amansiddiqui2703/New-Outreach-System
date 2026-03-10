@@ -215,7 +215,7 @@ export default function PrivacyPolicy() {
       `}</style>
 
             {/* Progress bar */}
-            <div style={{ position: "fixed", top: 0, left: 0, height: "3px", width: ${'`${scrollProgress}%`'}, background: "linear-gradient(90deg, #435AFF, #7B8FFF)", zIndex: 1000, transition: "width 0.1s" }} />
+            <div style={{ position: "fixed", top: 0, left: 0, height: "3px", width: `${scrollProgress}%`, background: "linear-gradient(90deg, #435AFF, #7B8FFF)", zIndex: 1000, transition: "width 0.1s" }} />
 
             {/* Top Nav Bar */}
             <div style={{ background: "white", borderBottom: "1px solid #E8ECFF", padding: "0 32px", height: "56px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100 }}>
@@ -255,7 +255,7 @@ export default function PrivacyPolicy() {
                     <div style={{ background: "white", border: "1px solid #E8ECFF", borderRadius: "12px", padding: "16px" }}>
                         <p style={{ fontSize: "11px", fontWeight: 700, color: "#9AA5BE", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "10px", paddingLeft: "12px" }}>Contents</p>
                         {sections.map((s) => (
-                            <button key={s.id} className=${'`nav-item ${activeSection === s.id ? "active" : ""}`'}
+                            <button key={s.id} className={`nav-item ${activeSection === s.id ? "active" : ""}`}
                                 onClick={() => document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}>
                                 <span style={{ color: "#435AFF", fontWeight: 700, marginRight: "6px" }}>{s.number}</span>{s.title}
                             </button>
@@ -314,7 +314,7 @@ export default function PrivacyPolicy() {
                                     {section.contact.map((row, i) => (
                                         <div key={i} className="contact-row">
                                             <span className="contact-label">{row.label}</span>
-                                            <span className="contact-value">{row.value.startsWith("http") ? <a href={row.value}>{row.value}</a> : row.value.includes("@") ? <a href=${'`mailto:${row.value}`'}>{row.value}</a> : row.value}</span>
+                                            <span className="contact-value">{row.value.startsWith("http") ? <a href={row.value}>{row.value}</a> : row.value.includes("@") ? <a href={`mailto:${row.value}`}>{row.value}</a> : row.value}</span>
                                         </div>
                                     ))}
                                 </div>

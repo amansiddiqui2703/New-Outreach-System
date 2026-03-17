@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import {
     Send, Users, Eye, MousePointerClick, BarChart3, TrendingUp,
-    ArrowUpRight, Mail, Zap, AlertTriangle
+    ArrowUpRight, Mail, Zap, AlertTriangle, CreditCard, Link as LinkIcon
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import OnboardingModal from '../components/OnboardingModal';
@@ -27,13 +27,20 @@ const StatCard = ({ icon: Icon, label, value, trend, color }) => (
 
 export default function Dashboard() {
     const [data, setData] = useState(null);
+    const [billing, setBilling] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get('/analytics/dashboard')
-            .then(res => setData(res.data))
-            .catch(() => { })
-            .finally(() => setLoading(false));
+        Promise.all([
+            api.get('/analytics/dashboard'),
+            api.get('/billing/status')
+        ])
+        .then(([analyticsRes, billingRes]) => {
+            setData(analyticsRes.data);
+            setBilling(billingRes.data);
+        })
+        .catch(() => { })
+        .finally(() => setLoading(false));
     }, []);
 
     if (loading) {
@@ -61,14 +68,35 @@ export default function Dashboard() {
         <div className="space-y-8">
             <OnboardingModal />
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold text-surface-900 dark:text-white">Dashboard</h1>
-                <p className="text-surface-500 mt-1">Your email outreach at a glance</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-surface-900 dark:text-white">Dashboard</h1>
+                    <p className="text-surface-500 mt-1">Your email outreach at a glance</p>
+                </div>
+                {billing && (
+                    <Link to="/billing" className="flex items-center gap-3 bg-surface-50 dark:bg-surface-800/50 px-4 py-2 rounded-xl border border-surface-200 dark:border-surface-700 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+                        <div className={`p-1.5 rounded-lg ${billing.plan === 'pro' ? 'bg-amber-500/20 text-amber-500' : 'bg-primary-500/20 text-primary-500'}`}>
+                            <CreditCard className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <div className="text-xs text-surface-500 font-medium">Current Plan</div>
+                            <div className="text-sm font-bold text-surface-900 dark:text-white capitalize">{billing.plan}</div>
+                        </div>
+                        <div className="h-8 w-px bg-surface-200 dark:bg-surface-700 mx-2" />
+                        <div>
+                            <div className="text-xs text-surface-500 font-medium">Daily Emails</div>
+                            <div className="text-sm font-bold text-surface-900 dark:text-white">
+                                {billing.usage?.emailsSentToday || 0} / {billing.limits?.emailsPerDay || 0}
+                            </div>
+                        </div>
+                    </Link>
+                )}
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <StatCard icon={Send} label="Emails Sent" value={o.totalSent || 0} trend="+12%" color="bg-gradient-to-br from-primary-500 to-primary-600" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                <StatCard icon={Send} label="Emails Sent" value={o.totalSent || 0} color="bg-gradient-to-br from-primary-500 to-primary-600" />
+                <StatCard icon={LinkIcon} label="Links Built" value={o.totalLinksBuilt || 0} trend="+2%" color="bg-gradient-to-br from-indigo-500 to-indigo-600" />
                 <StatCard icon={Eye} label="Open Rate" value={`${o.openRate || 0}%`} trend="+5%" color="bg-gradient-to-br from-green-500 to-green-600" />
                 <StatCard icon={MousePointerClick} label="Click Rate" value={`${o.clickRate || 0}%`} color="bg-gradient-to-br from-accent-500 to-accent-600" />
                 <StatCard icon={AlertTriangle} label="Bounce Rate" value={`${o.bounceRate || 0}%`} color="bg-gradient-to-br from-orange-500 to-orange-600" />

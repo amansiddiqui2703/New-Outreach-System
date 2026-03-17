@@ -22,9 +22,9 @@ const taskSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Contact',
     },
-    projectId: {
+    campaignId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Project',
+        ref: 'Campaign',
     },
     title: {
         type: String,

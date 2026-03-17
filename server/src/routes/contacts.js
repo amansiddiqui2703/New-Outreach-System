@@ -3,6 +3,7 @@ import multer from 'multer';
 import auth from '../middleware/auth.js';
 import Contact from '../models/Contact.js';
 import Suppression from '../models/Suppression.js';
+import planLimits from '../middleware/planLimits.js';
 import { parseCSV, deduplicateByEmail } from '../utils/csv.js';
 
 const router = Router();
@@ -11,7 +12,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 // List contacts
 router.get('/', auth, async (req, res) => {
     try {
-        const { page = 1, limit = 50, search, tag, source, projectId, pipelineStage, list, startDate, endDate } = req.query;
+        const { page = 1, limit = 50, search, tag, source, campaignId, pipelineStage, list, startDate, endDate } = req.query;
         const filter = { userId: req.user.id };
         // SECURITY: Escape regex special characters to prevent ReDoS/NoSQL injection
         if (search) {
@@ -24,7 +25,7 @@ router.get('/', auth, async (req, res) => {
         }
         if (tag) filter.tags = tag;
         if (source) filter.source = source;
-        if (projectId) filter.projectId = projectId;
+        if (campaignId) filter.campaignId = campaignId;
         if (pipelineStage) filter.pipelineStage = pipelineStage;
         if (list) filter.lists = list;
         if (startDate || endDate) {
@@ -82,9 +83,14 @@ router.get('/export', auth, async (req, res) => {
 });
 
 // Create contact
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, planLimits, async (req, res) => {
     try {
-        const { email, name, company, customFields, tags, lists, projectId, website, phone, linkedIn, twitter, pipelineStage, source } = req.body;
+        const count = await Contact.countDocuments({ userId: req.user.id });
+        if (count >= req.planLimits.contacts) {
+            return res.status(403).json({ error: `Plan limit reached. Your ${req.plan} plan allows up to ${req.planLimits.contacts} contacts.` });
+        }
+
+        const { email, name, company, customFields, tags, lists, campaignId, website, phone, linkedIn, twitter, pipelineStage, source } = req.body;
         const cleanEmail = (email || '').trim().toLowerCase();
         if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
             return res.status(400).json({ error: 'Please enter a valid email address' });
@@ -92,7 +98,7 @@ router.post('/', auth, async (req, res) => {
 
         const contact = new Contact({
             userId: req.user.id, email: cleanEmail, name, company, customFields, tags, lists,
-            source: source || 'manual', projectId, website, phone, linkedIn, twitter,
+            source: source || 'manual', campaignId, website, phone, linkedIn, twitter,
             pipelineStage: pipelineStage || 'Identified',
         });
         await contact.save();
@@ -104,12 +110,24 @@ router.post('/', auth, async (req, res) => {
 });
 
 // Upload CSV
-router.post('/upload', auth, upload.single('file'), async (req, res) => {
+router.post('/upload', auth, planLimits, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
+        const count = await Contact.countDocuments({ userId: req.user.id });
+        const limitLeft = req.planLimits.contacts - count;
+
+        if (limitLeft <= 0) {
+            return res.status(403).json({ error: `Plan limit reached. Your ${req.plan} plan allows up to ${req.planLimits.contacts} contacts. Please upgrade.` });
+        }
+
         const rows = await parseCSV(req.file.buffer);
-        const deduplicated = deduplicateByEmail(rows);
+        let deduplicated = deduplicateByEmail(rows);
+
+        // Cap uploads at remaining limits
+        if (deduplicated.length > limitLeft) {
+            deduplicated = deduplicated.slice(0, limitLeft);
+        }
 
         let imported = 0;
         let skipped = 0;
@@ -153,13 +171,21 @@ router.post('/upload', auth, upload.single('file'), async (req, res) => {
 });
 
 // Bulk paste
-router.post('/bulk', auth, async (req, res) => {
+router.post('/bulk', auth, planLimits, async (req, res) => {
     try {
         const { emails } = req.body; // array of { email, name?, company? }
         if (!Array.isArray(emails)) return res.status(400).json({ error: 'Emails array required' });
 
+        const count = await Contact.countDocuments({ userId: req.user.id });
+        let limitLeft = req.planLimits.contacts - count;
+        
+        if (limitLeft <= 0) {
+            return res.status(403).json({ error: `Plan limit reached. Max ${req.planLimits.contacts} contacts on ${req.plan} plan.` });
+        }
+
         let imported = 0;
         for (const item of emails) {
+            if (limitLeft <= 0) break;
             const email = (typeof item === 'string' ? item : item.email || '').toLowerCase().trim();
             if (!email || !email.includes('@') || !email.includes('.')) continue;
 
@@ -175,6 +201,7 @@ router.post('/bulk', auth, async (req, res) => {
                 { upsert: true }
             );
             imported++;
+            limitLeft--;
         }
 
         res.json({ imported });
@@ -267,18 +294,37 @@ router.get('/:id', auth, async (req, res) => {
     }
 });
 
+// Update contact pipeline stage
+router.patch('/:id/stage', auth, async (req, res) => {
+    try {
+        const { pipelineStage } = req.body;
+        if (!pipelineStage) return res.status(400).json({ error: 'Pipeline stage is required' });
+
+        const contact = await Contact.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user.id },
+            { pipelineStage, pipelineStageMovedAt: new Date() },
+            { new: true }
+        );
+
+        if (!contact) return res.status(404).json({ error: 'Contact not found' });
+        res.json({ contact });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update pipeline stage' });
+    }
+});
+
 // Update contact
 router.put('/:id', auth, async (req, res) => {
     try {
         // SECURITY: Whitelist allowed fields instead of passing raw req.body
-        const { name, company, tags, lists, customFields, projectId, pipelineStage, website, phone, linkedIn, twitter, assignedTo } = req.body;
+        const { name, company, tags, lists, customFields, campaignId, pipelineStage, website, phone, linkedIn, twitter, assignedTo } = req.body;
         const update = {};
         if (name !== undefined) update.name = name;
         if (company !== undefined) update.company = company;
         if (tags !== undefined) update.tags = tags;
         if (lists !== undefined) update.lists = lists;
         if (customFields !== undefined) update.customFields = customFields;
-        if (projectId !== undefined) update.projectId = projectId || null;
+        if (campaignId !== undefined) update.campaignId = campaignId || null;
         if (website !== undefined) update.website = website;
         if (phone !== undefined) update.phone = phone;
         if (linkedIn !== undefined) update.linkedIn = linkedIn;

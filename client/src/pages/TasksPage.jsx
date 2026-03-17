@@ -284,10 +284,10 @@ export default function TasksPage() {
                                                 <User className="w-3 h-3" /> {task.contactId.name || task.contactId.email}
                                             </span>
                                         )}
-                                        {/* Project */}
-                                        {task.projectId && (
-                                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: `${task.projectId.color}20`, color: task.projectId.color }}>
-                                                {task.projectId.name}
+                                        {/* Campaign */}
+                                        {task.campaignId && (
+                                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: `${task.campaignId.color}20`, color: task.campaignId.color }}>
+                                                {task.campaignId.name}
                                             </span>
                                         )}
                                     </div>

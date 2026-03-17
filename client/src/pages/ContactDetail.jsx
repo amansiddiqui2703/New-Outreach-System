@@ -30,10 +30,11 @@ export default function ContactDetail() {
     const [editForm, setEditForm] = useState({});
     const [saving, setSaving] = useState(false);
 
-    // Follow-up state
-    const [followUpEmailId, setFollowUpEmailId] = useState(null);
-    const [followUpBody, setFollowUpBody] = useState('');
     const [followUpSending, setFollowUpSending] = useState(false);
+
+    // Stage
+    const [updatingStage, setUpdatingStage] = useState(false);
+    const PIPELINE_STAGES = ['Identified', 'Contacted', 'Replied', 'Negotiating', 'Link Secured', 'Lost'];
 
     useEffect(() => {
         fetchContactData();
@@ -102,6 +103,19 @@ export default function ContactDetail() {
         }
     };
 
+    const handleStageChange = async (newStage) => {
+        setUpdatingStage(true);
+        try {
+            await api.patch(`/contacts/${id}/stage`, { pipelineStage: newStage });
+            toast.success(`Pipeline updated to ${newStage}`);
+            setContact(prev => ({ ...prev, pipelineStage: newStage }));
+        } catch (err) {
+            toast.error('Failed to update pipeline stage');
+        } finally {
+            setUpdatingStage(false);
+        }
+    };
+
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleString('en-US', {
             month: 'short', day: 'numeric', year: 'numeric',
@@ -139,7 +153,22 @@ export default function ContactDetail() {
                                 {contact.email.charAt(0).toUpperCase()}
                             </div>
                             {!isEditing ? (
-                                <div className="flex gap-2">
+                                <div className="flex items-center gap-3">
+                                    <select
+                                        value={contact.pipelineStage || 'Identified'}
+                                        onChange={(e) => handleStageChange(e.target.value)}
+                                        disabled={updatingStage}
+                                        className={`text-xs font-semibold px-3 py-1.5 rounded-lg border-0 cursor-pointer transition-colors ${
+                                            contact.pipelineStage === 'Link Secured' 
+                                            ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' 
+                                            : 'bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-300'
+                                        }`}
+                                    >
+                                        {PIPELINE_STAGES.map(stage => (
+                                            <option key={stage} value={stage}>{stage}</option>
+                                        ))}
+                                    </select>
+                                    <div className="h-6 w-px bg-surface-200 dark:bg-surface-700 mx-1"></div>
                                     <button onClick={() => setIsEditing(true)} className="p-2 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-lg text-surface-500 transition-colors" title="Edit Contact">
                                         <Edit2 className="w-4 h-4" />
                                     </button>

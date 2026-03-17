@@ -9,7 +9,7 @@ const router = Router();
 // List tasks (with filters)
 router.get('/', auth, async (req, res) => {
     try {
-        const { status, assignedTo, priority, projectId, contactId, sort } = req.query;
+        const { status, assignedTo, priority, campaignId, contactId, sort } = req.query;
 
         // Build query: user's own tasks OR tasks assigned to them
         const query = {
@@ -22,7 +22,7 @@ router.get('/', auth, async (req, res) => {
         if (status && status !== 'all') query.status = status;
         if (assignedTo) query.assignedTo = assignedTo;
         if (priority) query.priority = priority;
-        if (projectId) query.projectId = projectId;
+        if (campaignId) query.campaignId = campaignId;
         if (contactId) query.contactId = contactId;
 
         let sortObj = { createdAt: -1 };
@@ -33,7 +33,7 @@ router.get('/', auth, async (req, res) => {
             .populate('assignedTo', 'name email')
             .populate('assignedBy', 'name email')
             .populate('contactId', 'name email company')
-            .populate('projectId', 'name color')
+            .populate('campaignId', 'name color')
             .sort(sortObj)
             .limit(200)
             .lean();
@@ -57,7 +57,7 @@ router.get('/', auth, async (req, res) => {
 // Create task
 router.post('/', auth, async (req, res) => {
     try {
-        const { title, description, type, priority, status, dueDate, assignedTo, contactId, projectId, teamId } = req.body;
+        const { title, description, type, priority, status, dueDate, assignedTo, contactId, campaignId, teamId } = req.body;
 
         if (!title?.trim()) return res.status(400).json({ error: 'Title is required' });
 
@@ -67,7 +67,7 @@ router.post('/', auth, async (req, res) => {
             assignedTo: assignedTo || req.user.id,
             assignedBy: assignedTo && assignedTo !== req.user.id ? req.user.id : undefined,
             contactId: contactId || undefined,
-            projectId: projectId || undefined,
+            campaignId: campaignId || undefined,
             title: title.trim(),
             description: description || '',
             type: type || 'other',
@@ -81,7 +81,7 @@ router.post('/', auth, async (req, res) => {
         const populated = await Task.findById(task._id)
             .populate('assignedTo', 'name email')
             .populate('contactId', 'name email company')
-            .populate('projectId', 'name color');
+            .populate('campaignId', 'name color');
 
         // Log activity
         await Activity.log({
@@ -91,7 +91,7 @@ router.post('/', auth, async (req, res) => {
             title: `Created task: ${title.trim()}`,
             taskId: task._id,
             contactId: contactId || undefined,
-            projectId: projectId || undefined,
+            campaignId: campaignId || undefined,
         });
 
         res.status(201).json(populated);
@@ -111,7 +111,7 @@ router.put('/:id', auth, async (req, res) => {
 
         if (!task) return res.status(404).json({ error: 'Task not found' });
 
-        const allowed = ['title', 'description', 'type', 'priority', 'status', 'dueDate', 'assignedTo', 'contactId', 'projectId'];
+        const allowed = ['title', 'description', 'type', 'priority', 'status', 'dueDate', 'assignedTo', 'contactId', 'campaignId'];
         for (const key of allowed) {
             if (req.body[key] !== undefined) {
                 task[key] = req.body[key];
@@ -138,7 +138,7 @@ router.put('/:id', auth, async (req, res) => {
         const populated = await Task.findById(task._id)
             .populate('assignedTo', 'name email')
             .populate('contactId', 'name email company')
-            .populate('projectId', 'name color');
+            .populate('campaignId', 'name color');
 
         res.json(populated);
     } catch (error) {

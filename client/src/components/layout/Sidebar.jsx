@@ -9,17 +9,18 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/contacts', icon: Users, label: 'Master Audience' },
-    { to: '/sequences', icon: FileText, label: 'Sequences' },
-    { to: '/projects', icon: Send, label: 'Campaigns' },
-    { to: '/inbox', icon: Inbox, label: 'Unified Inbox' },
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['admin', 'manager', 'user', 'agent'] },
+    { to: '/contacts', icon: Users, label: 'Master Audience', roles: ['admin', 'manager', 'user', 'agent'] },
+    { to: '/sequences', icon: FileText, label: 'Sequences', roles: ['admin', 'manager', 'user', 'agent'] },
+
+    { to: '/campaigns', icon: Send, label: 'Campaigns', roles: ['admin', 'manager', 'user', 'agent'] },
+    { to: '/inbox', icon: Inbox, label: 'Unified Inbox', roles: ['admin', 'manager', 'user', 'agent'] },
     { divider: true },
-    { to: '/tools', icon: Zap, label: 'Tools' },
+    { to: '/tools', icon: Zap, label: 'Tools', roles: ['admin', 'manager', 'user', 'agent'] },
     { divider: true },
-    { to: '/accounts', icon: Mail, label: 'Accounts' },
-    { to: '/billing', icon: CreditCard, label: 'Billing' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
+    { to: '/accounts', icon: Mail, label: 'Accounts', roles: ['admin', 'manager', 'user'] },
+    { to: '/billing', icon: CreditCard, label: 'Billing', roles: ['admin', 'manager', 'user'] },
+    { to: '/settings', icon: Settings, label: 'Settings', roles: ['admin', 'manager', 'user'] },
 ];
 
 export default function Sidebar() {
@@ -51,7 +52,11 @@ export default function Sidebar() {
                     if (item.divider) {
                         return <div key={`div-${idx}`} className="my-2 mx-4 h-px bg-surface-200 dark:bg-surface-700" />;
                     }
-                    const { to, icon: Icon, label } = item;
+                    const { to, icon: Icon, label, roles } = item;
+                    
+                    // Conditionally hide items if user role isn't allowed
+                    if (roles && user && !roles.includes(user.role)) return null;
+
                     return (
                         <NavLink
                             key={to}
@@ -71,11 +76,28 @@ export default function Sidebar() {
                     );
                 })}
 
+                {/* Team Reports for Admin/Manager */}
+                {['admin', 'manager'].includes(user?.role) && (
+                    <NavLink
+                        to="/team-reports"
+                        className={({ isActive }) =>
+                            `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group mt-4 border-t border-surface-200 dark:border-surface-800 pt-4
+              ${isActive
+                                ? 'bg-gradient-to-r from-primary-500/10 to-accent-500/10 text-primary-600 dark:text-primary-400'
+                                : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+                            }`
+                        }
+                    >
+                        <Users className="w-[18px] h-[18px] text-primary-500 transition-transform group-hover:scale-110" />
+                        Team Reports
+                    </NavLink>
+                )}
+
                 {user?.role === 'admin' && (
                     <NavLink
                         to="/admin"
                         className={({ isActive }) =>
-                            `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group mt-4 border-t border-surface-200 dark:border-surface-800 pt-4
+                            `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group
               ${isActive
                                 ? 'bg-gradient-to-r from-primary-500/10 to-accent-500/10 text-primary-600 dark:text-primary-400'
                                 : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'

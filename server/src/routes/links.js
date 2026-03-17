@@ -7,9 +7,9 @@ const router = Router();
 // List links
 router.get('/', auth, async (req, res) => {
     try {
-        const { projectId, status, page = 1, limit = 50 } = req.query;
+        const { campaignId, status, page = 1, limit = 50 } = req.query;
         const filter = { userId: req.user.id };
-        if (projectId) filter.projectId = projectId;
+        if (campaignId) filter.campaignId = campaignId;
         if (status) filter.status = status;
 
         const [links, total] = await Promise.all([
@@ -24,7 +24,7 @@ router.get('/', auth, async (req, res) => {
 
         // Stats
         const stats = await Link.aggregate([
-            { $match: { userId: req.user.id, ...(projectId ? { projectId: Link.castId(projectId) } : {}) } },
+            { $match: { userId: new mongoose.Types.ObjectId(req.user.id), ...(campaignId ? { campaignId: new mongoose.Types.ObjectId(campaignId) } : {}) } },
             { $group: { _id: '$status', count: { $sum: 1 } } },
         ]);
 
@@ -46,7 +46,7 @@ router.get('/', auth, async (req, res) => {
 // Create link
 router.post('/', auth, async (req, res) => {
     try {
-        const { targetUrl, linkUrl, anchorText, projectId, contactId, campaignId, notes } = req.body;
+        const { targetUrl, linkUrl, anchorText, campaignId, contactId, notes } = req.body;
         if (!targetUrl?.trim()) return res.status(400).json({ error: 'Target URL is required' });
 
         const link = await Link.create({
@@ -54,7 +54,6 @@ router.post('/', auth, async (req, res) => {
             targetUrl: targetUrl.trim(),
             linkUrl: linkUrl || '',
             anchorText: anchorText || '',
-            projectId,
             contactId,
             campaignId,
             notes: notes || '',
@@ -158,9 +157,9 @@ router.delete('/:id', auth, async (req, res) => {
 // Bulk check all links for a project
 router.post('/bulk-check', auth, async (req, res) => {
     try {
-        const { projectId } = req.body;
+        const { campaignId } = req.body;
         const filter = { userId: req.user.id };
-        if (projectId) filter.projectId = projectId;
+        if (campaignId) filter.campaignId = campaignId;
 
         const links = await Link.find(filter);
         res.json({ message: `Checking ${links.length} links in background`, count: links.length });

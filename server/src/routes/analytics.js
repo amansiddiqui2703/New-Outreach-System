@@ -5,6 +5,8 @@ import EmailLog from '../models/EmailLog.js';
 import TrackingEvent from '../models/TrackingEvent.js';
 import GmailAccount from '../models/GmailAccount.js';
 import Contact from '../models/Contact.js';
+import User from '../models/User.js';
+import authorize from '../middleware/authorize.js';
 
 const router = Router();
 
@@ -24,6 +26,7 @@ router.get('/dashboard', auth, async (req, res) => {
             totalContacts,
             accounts,
             recentCampaigns,
+            totalLinksBuilt,
         ] = await Promise.all([
             Campaign.countDocuments({ userId }),
             Campaign.countDocuments({ userId, status: 'running' }),
@@ -34,6 +37,7 @@ router.get('/dashboard', auth, async (req, res) => {
             Contact.countDocuments({ userId }),
             GmailAccount.find({ userId }).select('email dailySentCount dailyLimit health totalSent'),
             Campaign.find({ userId }).sort({ updatedAt: -1 }).limit(10).select('name status stats updatedAt createdAt'),
+            Contact.countDocuments({ userId, pipelineStage: 'Link Secured' }),
         ]);
 
         // Get user's tracking IDs from their email logs
@@ -125,6 +129,7 @@ router.get('/dashboard', auth, async (req, res) => {
             overview: {
                 totalCampaigns, activeCampaigns, totalSent, totalFailed, totalBounced,
                 totalOpened, totalClicked, totalReplied, totalUnsubscribed, totalContacts,
+                totalLinksBuilt,
                 openRate: totalSent ? ((totalOpened / totalSent) * 100).toFixed(1) : '0',
                 clickRate: totalSent ? ((totalClicked / totalSent) * 100).toFixed(1) : '0',
                 bounceRate: totalSent ? ((totalBounced / totalSent) * 100).toFixed(1) : '0',
@@ -136,6 +141,67 @@ router.get('/dashboard', auth, async (req, res) => {
     } catch (error) {
         console.error('Analytics dashboard error:', error);
         res.status(500).json({ error: 'Failed to fetch analytics' });
+    }
+});
+
+// ==========================================
+// Team Productivity Reports (Admin/Manager only)
+// ==========================================
+router.get('/team', auth, authorize('admin', 'manager'), async (req, res) => {
+    try {
+        // Find all users (agents/managers/admins)
+        // Note: In a true multi-tenant system, filter by organizationId. 
+        // For now, we fetch all users.
+        const users = await User.find({}).select('name email role').lean();
+        
+        const teamStats = await Promise.all(users.map(async (u) => {
+            // Get links built (conversions) for this user
+            const linksBuilt = await Contact.countDocuments({ userId: u._id, pipelineStage: 'Link Secured' });
+            
+            // Get email sending stats for this user
+            const [sent, failed, bounced] = await Promise.all([
+                EmailLog.countDocuments({ userId: u._id, status: 'sent' }),
+                EmailLog.countDocuments({ userId: u._id, status: 'failed' }),
+                EmailLog.countDocuments({ userId: u._id, status: 'bounced' })
+            ]);
+
+            // Get tracking stats
+            const userEmailLogs = await EmailLog.find({ userId: u._id }).select('trackingId').lean();
+            const userTrackingIds = userEmailLogs.map(l => l.trackingId).filter(Boolean);
+            
+            let opens = 0, clicks = 0, replies = 0;
+            if (userTrackingIds.length > 0) {
+                [opens, clicks, replies] = await Promise.all([
+                    TrackingEvent.countDocuments({ trackingId: { $in: userTrackingIds }, type: 'open' }),
+                    TrackingEvent.countDocuments({ trackingId: { $in: userTrackingIds }, type: 'click' }),
+                    TrackingEvent.countDocuments({ trackingId: { $in: userTrackingIds }, type: 'reply' })
+                ]);
+            }
+
+            return {
+                userId: u._id,
+                name: u.name || 'Unknown',
+                email: u.email,
+                role: u.role,
+                metrics: {
+                    sent,
+                    failed,
+                    bounced,
+                    opens,
+                    clicks,
+                    replies,
+                    linksBuilt,
+                    openRate: sent > 0 ? ((opens / sent) * 100).toFixed(1) : '0.0',
+                    replyRate: sent > 0 ? ((replies / sent) * 100).toFixed(1) : '0.0',
+                    conversionRate: sent > 0 ? ((linksBuilt / sent) * 100).toFixed(1) : '0.0'
+                }
+            };
+        }));
+
+        res.json({ team: teamStats });
+    } catch (error) {
+        console.error('Team analytics error:', error);
+        res.status(500).json({ error: 'Failed to fetch team analytics' });
     }
 });
 

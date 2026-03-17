@@ -31,7 +31,7 @@ import templateRoutes from './routes/templates.js';
 import chatbotRoutes from './routes/chatbot.js';
 import billingRoutes from './routes/billing.js';
 import adminRoutes from './routes/admin.js';
-import projectRoutes from './routes/projects.js';
+
 import noteRoutes from './routes/notes.js';
 import smartListRoutes from './routes/smartLists.js';
 import linkRoutes from './routes/links.js';
@@ -101,7 +101,7 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/projects', projectRoutes);
+
 app.use('/api/notes', noteRoutes);
 app.use('/api/smart-lists', smartListRoutes);
 app.use('/api/links', linkRoutes);

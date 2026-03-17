@@ -11,9 +11,9 @@ const noteSchema = new mongoose.Schema({
         ref: 'Contact',
         required: true,
     },
-    projectId: {
+    campaignId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Project',
+        ref: 'Campaign',
     },
     content: {
         type: String,

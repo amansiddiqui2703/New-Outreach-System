@@ -18,7 +18,6 @@ router.get('/', auth, async (req, res) => {
             .limit(parseInt(limit))
             .populate('campaignId', 'name')
             .populate('contactId', 'name email')
-            .populate('projectId', 'name')
             .populate('taskId', 'title status')
             .lean();
 

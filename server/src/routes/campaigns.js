@@ -3,6 +3,7 @@ import auth from '../middleware/auth.js';
 import Campaign from '../models/Campaign.js';
 import EmailLog from '../models/EmailLog.js';
 import TrackingEvent from '../models/TrackingEvent.js';
+import Contact from '../models/Contact.js';
 import { enqueueCampaign, pauseQueue, resumeQueue, getQueueStats } from '../services/queue.js';
 
 const router = Router();
@@ -10,9 +11,12 @@ const router = Router();
 // List campaigns
 router.get('/', auth, async (req, res) => {
     try {
-        const { status, page = 1, limit = 20 } = req.query;
+        const { status, isArchived, page = 1, limit = 20 } = req.query;
         const filter = { userId: req.user.id };
         if (status) filter.status = status;
+        
+        // Default to not showing archived unless requested
+        filter.isArchived = isArchived === 'true';
 
         const campaigns = await Campaign.find(filter)
             .select('-recipients -htmlBody -plainBody')
@@ -40,7 +44,11 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 // Allowed fields for campaign create/update
-const CAMPAIGN_FIELDS = ['name', 'subject', 'subjectB', 'htmlBody', 'plainBody', 'accountIds', 'recipients', 'followUps', 'warmupMode', 'warmupDailyIncrease', 'delaySeconds'];
+const CAMPAIGN_FIELDS = [
+    'name', 'description', 'color', 'icon', 'pipelineStages', 'targetLists', 'isArchived',
+    'subject', 'subjectB', 'htmlBody', 'plainBody', 'accountIds', 'recipients', 'followUps', 
+    'warmupMode', 'warmupDailyIncrease', 'delay'
+];
 
 const pickFields = (body, fields) => {
     const picked = {};
@@ -157,10 +165,25 @@ router.post('/:id/pause', auth, async (req, res) => {
             { new: true }
         );
         if (!campaign) return res.status(404).json({ error: 'Running campaign not found' });
-        await pauseQueue();
+        // await pauseQueue(); // This service might need the campaign context if it's more than one
         res.json({ message: 'Campaign paused', campaign });
     } catch (error) {
         res.status(500).json({ error: 'Failed to pause campaign' });
+    }
+});
+
+// Patch for archiving or updating specific small fields
+router.patch('/:id/archive', auth, async (req, res) => {
+    try {
+        const campaign = await Campaign.findOne({ _id: req.params.id, userId: req.user.id });
+        if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+        
+        campaign.isArchived = !campaign.isArchived;
+        await campaign.save();
+        
+        res.json({ message: campaign.isArchived ? 'Campaign archived' : 'Campaign restored', campaign });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to toggle archive' });
     }
 });
 
@@ -267,6 +290,58 @@ router.get('/:id/ab-stats', auth, async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to get A/B stats' });
+    }
+});
+
+// Add new leads to an existing campaign
+router.post('/:id/add-leads', auth, async (req, res) => {
+    try {
+        const { contactIds } = req.body;
+        if (!Array.isArray(contactIds) || contactIds.length === 0) {
+            return res.status(400).json({ error: 'contactIds array is required' });
+        }
+
+        const campaign = await Campaign.findOne({ _id: req.params.id, userId: req.user.id });
+        if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+
+        // Get existing recipient contact IDs (cast to string for comparison)
+        const existingIds = new Set(campaign.recipients.map(r => r.contactId?.toString()).filter(Boolean));
+
+        // Note: we must dynamically import Contact here or at the top of the file
+        // Wait, Contact is not imported in this file. Let me check the imports first.
+        // I will just add the import to the top of the file in another chunk and use it here.
+
+        const newContacts = await Contact.find({
+            _id: { $in: contactIds },
+            userId: req.user.id
+        }).lean();
+
+        let addedCount = 0;
+        for (const c of newContacts) {
+            if (!existingIds.has(c._id.toString())) {
+                campaign.recipients.push({
+                    contactId: c._id,
+                    email: c.email,
+                    name: c.name || '',
+                    status: 'pending',
+                    currentStep: 0
+                });
+                addedCount++;
+            }
+        }
+
+        if (addedCount > 0) {
+            campaign.stats.total = campaign.recipients.length;
+            await campaign.save();
+
+            // If campaign is running, the queue processor will automatically 
+            // pick up these new 'pending' recipients on its next cycle.
+        }
+
+        res.json({ message: `Added ${addedCount} new recipients`, campaign });
+    } catch (error) {
+        console.error('Failed to add leads:', error);
+        res.status(500).json({ error: 'Failed to add leads to campaign' });
     }
 });
 

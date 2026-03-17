@@ -22,7 +22,7 @@ router.get('/contact/:contactId', auth, async (req, res) => {
 // Create note
 router.post('/', auth, async (req, res) => {
     try {
-        const { contactId, projectId, content, type } = req.body;
+        const { contactId, campaignId, content, type } = req.body;
         if (!contactId || !content?.trim()) {
             return res.status(400).json({ error: 'contactId and content are required' });
         }
@@ -34,7 +34,7 @@ router.post('/', auth, async (req, res) => {
         const note = await Note.create({
             userId: req.user.id,
             contactId,
-            projectId: projectId || contact.projectId,
+            campaignId: campaignId || contact.campaignId,
             content: content.trim(),
             type: type || 'note',
         });

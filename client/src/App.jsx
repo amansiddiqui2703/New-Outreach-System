@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import AppLayout from './components/layout/AppLayout';
+import ProtectedRoute from './components/layout/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -24,8 +25,7 @@ import ResetPassword from './pages/ResetPassword';
 import Admin from './pages/Admin';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
-import Projects from './pages/Projects';
-import ProjectDetail from './pages/ProjectDetail';
+
 import SmartLists from './pages/SmartLists';
 import Links from './pages/Links';
 import TeamPage from './pages/TeamPage';
@@ -33,6 +33,7 @@ import TasksPage from './pages/TasksPage';
 import ActivityPage from './pages/ActivityPage';
 import InboxPage from './pages/InboxPage';
 import SeoTools from './pages/SeoTools';
+import TeamReports from './pages/TeamReports';
 
 import Sequences from './pages/Sequences';
 import Tools from './pages/Tools';
@@ -71,23 +72,23 @@ export default function App() {
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/contacts/:id" element={<ContactDetail />} />
               <Route path="/sequences" element={<Sequences />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/projects/:id" element={<ProjectDetail />} />
+
               <Route path="/inbox" element={<InboxPage />} />
               <Route path="/tools" element={<Tools />} />
               <Route path="/finder" element={<EmailFinder />} />
               <Route path="/analytics" element={<Analytics />} />
-              <Route path="/accounts" element={<Accounts />} />
+              <Route path="/accounts" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'user']}><Accounts /></ProtectedRoute>} />
               <Route path="/settings" element={<Settings />} />
-              <Route path="/billing" element={<Billing />} />
+              <Route path="/billing" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'user']}><Billing /></ProtectedRoute>} />
+              <Route path="/team-reports" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><TeamReports /></ProtectedRoute>} />
               <Route path="/templates" element={<Templates />} />
               <Route path="/smart-lists" element={<SmartLists />} />
               <Route path="/links" element={<Links />} />
-              <Route path="/team" element={<TeamPage />} />
+              <Route path="/team" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'user']}><TeamPage /></ProtectedRoute>} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/activity" element={<ActivityPage />} />
               <Route path="/seo" element={<SeoTools />} />
-              <Route path="/admin" element={<Admin />} />
+              <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><Admin /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

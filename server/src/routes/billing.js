@@ -4,6 +4,7 @@ import auth from '../middleware/auth.js';
 import User from '../models/User.js';
 import env from '../config/env.js';
 import { PLAN_LIMITS } from '../middleware/planLimits.js';
+import authorize from '../middleware/authorize.js';
 
 const router = Router();
 
@@ -19,7 +20,7 @@ const PRICE_MAP = {
 };
 
 // Get billing status + plan info
-router.get('/status', auth, async (req, res) => {
+router.get('/status', auth, authorize('admin', 'manager', 'user'), async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('plan stripeCustomerId stripeSubscriptionId planExpiresAt').lean();
         if (!user) return res.status(404).json({ error: 'User not found' });
@@ -60,7 +61,7 @@ router.get('/status', auth, async (req, res) => {
 });
 
 // Create Stripe Checkout session
-router.post('/create-checkout', auth, async (req, res) => {
+router.post('/create-checkout', auth, authorize('admin', 'manager', 'user'), async (req, res) => {
     try {
         const stripe = getStripe();
         if (!stripe) return res.status(500).json({ error: 'Stripe is not configured. Add STRIPE_SECRET_KEY to your .env file.' });
@@ -109,7 +110,7 @@ router.post('/create-checkout', auth, async (req, res) => {
 });
 
 // Create Stripe Customer Portal session
-router.post('/create-portal', auth, async (req, res) => {
+router.post('/create-portal', auth, authorize('admin', 'manager', 'user'), async (req, res) => {
     try {
         const stripe = getStripe();
         if (!stripe) return res.status(500).json({ error: 'Stripe is not configured.' });
@@ -141,6 +142,73 @@ router.get('/plans', async (req, res) => {
             { id: 'pro', name: 'Pro', price: 124, ...PLAN_LIMITS.pro },
         ],
     });
+});
+
+// Stripe Webhook Receiver
+// Note: In production this should use express.raw, but we parse req.body for local
+router.post('/webhook', async (req, res) => {
+    const stripe = getStripe();
+    if (!stripe) return res.status(500).send('Stripe not configured');
+
+    const sig = req.headers['stripe-signature'];
+    const endpointSecret = env.STRIPE_WEBHOOK_SECRET;
+
+    let event;
+
+    try {
+        if (endpointSecret) {
+            // Verify signature if secret provided
+            event = stripe.webhooks.constructEvent(req.rawBody || req.body, sig, endpointSecret);
+        } else {
+            console.warn(`Webhook signature verification skipped. No STRIPE_WEBHOOK_SECRET found.`);
+            event = req.body;
+        }
+    } catch (err) {
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    try {
+        switch (event.type) {
+            case 'checkout.session.completed': {
+                const session = event.data.object;
+                const userId = session.metadata?.userId;
+                const planId = session.metadata?.plan || 'pro'; // default fallback
+                const subscriptionId = session.subscription;
+
+                if (userId) {
+                    await User.findByIdAndUpdate(userId, {
+                        plan: planId,
+                        stripeSubscriptionId: subscriptionId,
+                        planExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) 
+                    });
+                    console.log(`User ${userId} upgraded to ${planId}`);
+                }
+                break;
+            }
+            case 'invoice.payment_succeeded': {
+                const invoice = event.data.object;
+                if(invoice.subscription) {
+                     await User.findOneAndUpdate(
+                         { stripeSubscriptionId: invoice.subscription },
+                         { planExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
+                     );
+                }
+                break;
+            }
+            case 'customer.subscription.deleted': {
+                const subscription = event.data.object;
+                await User.findOneAndUpdate(
+                    { stripeSubscriptionId: subscription.id },
+                    { plan: 'free', stripeSubscriptionId: null, planExpiresAt: new Date(0) }
+                );
+                break;
+            }
+        }
+        res.json({ received: true });
+    } catch (error) {
+        console.error('Webhook processing error:', error);
+        res.status(500).json({ error: 'Webhook processing failed' });
+    }
 });
 
 export default router;

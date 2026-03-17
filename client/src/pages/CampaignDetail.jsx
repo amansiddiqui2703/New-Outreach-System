@@ -87,6 +87,10 @@ export default function CampaignDetail() {
     // Recipient add
     const [showAddRecipients, setShowAddRecipients] = useState(false);
     const [recipientSearch, setRecipientSearch] = useState('');
+    const [filterSource, setFilterSource] = useState('');
+    const [filterStartDate, setFilterStartDate] = useState('');
+    const [filterEndDate, setFilterEndDate] = useState('');
+    const [addingLeads, setAddingLeads] = useState(false);
 
     const editor = useEditor({
         extensions: [
@@ -338,13 +342,87 @@ export default function CampaignDetail() {
         );
     };
 
-    const filteredContacts = contacts.filter(c =>
-        !recipients.find(r => r.email === c.email) &&
-        (c.email?.toLowerCase().includes(recipientSearch.toLowerCase()) ||
-            c.name?.toLowerCase().includes(recipientSearch.toLowerCase()))
-    );
-
     const isEditable = campaign?.status === 'draft' || campaign?.status === 'paused';
+
+    const handleAddSelectedContacts = async (contactsToAdd) => {
+        const newRecipients = contactsToAdd.map(c => ({
+            contactId: c._id,
+            email: c.email,
+            name: c.name || '',
+            company: c.company || '',
+            status: 'pending',
+        }));
+
+        if (isEditable) {
+            // Just update local state, user will click Save
+            setRecipients([...recipients, ...newRecipients]);
+            toast.success(`${newRecipients.length} contacts added to draft! Click Save.`);
+            setShowAddRecipients(false);
+            setRecipientSearch('');
+        } else {
+            // Campaign is running/scheduled, hit the API directly
+            setAddingLeads(true);
+            try {
+                const contactIds = contactsToAdd.map(c => c._id);
+                const res = await api.post(`/campaigns/${id}/add-leads`, { contactIds });
+                toast.success(res.data.message || 'Contacts added to campaign!');
+                setShowAddRecipients(false);
+                setRecipientSearch('');
+                fetchCampaign(); // Refresh everything
+            } catch (err) {
+                toast.error(err.response?.data?.error || 'Failed to add leads');
+            } finally {
+                setAddingLeads(false);
+            }
+        }
+    };
+
+    const filteredContacts = contacts.filter(c => {
+        // Exclude already added
+        if (recipients.find(r => r.email === c.email)) return false;
+        
+        // Name/Email search
+        if (recipientSearch && !c.email?.toLowerCase().includes(recipientSearch.toLowerCase()) && !c.name?.toLowerCase().includes(recipientSearch.toLowerCase())) {
+            return false;
+        }
+
+        // Source filter
+        if (filterSource && c.source !== filterSource) return false;
+
+        // Date filters
+        if (filterStartDate || filterEndDate) {
+            const createdAt = new Date(c.createdAt);
+            if (filterStartDate && createdAt < new Date(filterStartDate)) return false;
+            if (filterEndDate) {
+                const end = new Date(filterEndDate);
+                end.setHours(23, 59, 59, 999);
+                if (createdAt > end) return false;
+            }
+        }
+
+        return true;
+    });
+
+    // Extract unique sources for the filter dropdown
+    const availableSources = [...new Set(contacts.map(c => c.source).filter(Boolean))];
+
+    const handleDragStart = (e, contact) => {
+        e.dataTransfer.setData('contactId', contact._id);
+    };
+
+    const handleDrop = async (e, newStage) => {
+        e.preventDefault();
+        const contactId = e.dataTransfer.getData('contactId');
+        if (!contactId) return;
+
+        try {
+            await api.patch(`/contacts/${contactId}/stage`, { pipelineStage: newStage });
+            toast.success(`Moved to ${newStage}`);
+            fetchContacts();
+        } catch {
+            toast.error('Failed to move contact');
+        }
+    };
 
     if (loading) {
         return (
@@ -437,12 +515,12 @@ export default function CampaignDetail() {
                     ))}
                 </div>
             )}
-
             {/* Tabs */}
             <div className="flex gap-1 bg-surface-100 dark:bg-surface-800 rounded-xl p-1">
                 {[
                     { key: 'content', label: 'Email Content', icon: Mail },
                     { key: 'sequence', label: 'Sequence Builder', icon: Zap },
+                    { key: 'pipeline', label: 'Pipeline', icon: GripVertical },
                     { key: 'recipients', label: 'Recipients', icon: Users },
                     { key: 'settings', label: 'Settings', icon: SettingsIcon },
                 ].map(({ key, label, icon: Icon }) => (
@@ -809,6 +887,64 @@ export default function CampaignDetail() {
                 </div>
             )}
 
+            {/* === TAB: Pipeline (Kanban) === */}
+            {activeTab === 'pipeline' && (
+                <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 min-h-[600px] scrollbar-thin scrollbar-thumb-surface-200 dark:scrollbar-thumb-surface-700">
+                    {(campaign?.pipelineStages || []).map(stage => {
+                        const stageContacts = contacts.filter(c => c.pipelineStage === stage.name);
+                        return (
+                            <div 
+                                key={stage.name} 
+                                className="flex-shrink-0 w-72 flex flex-col gap-3"
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => handleDrop(e, stage.name)}
+                            >
+                                <div className="flex items-center justify-between px-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: stage.color }} />
+                                        <h3 className="font-bold text-surface-900 dark:text-white text-sm uppercase tracking-wider">{stage.name}</h3>
+                                        <span className="bg-surface-100 dark:bg-surface-800 text-surface-500 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                                            {stageContacts.length}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 bg-surface-50/50 dark:bg-surface-800/20 rounded-2xl p-2 border border-surface-200/50 dark:border-surface-700/50 space-y-3">
+                                    {stageContacts.length === 0 ? (
+                                        <div className="py-12 text-center">
+                                            <div className="text-[10px] font-bold text-surface-300 uppercase tracking-widest">Empty Stage</div>
+                                        </div>
+                                    ) : (
+                                        stageContacts.map(contact => (
+                                            <div
+                                                key={contact._id}
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, contact)}
+                                                onClick={() => navigate(`/contacts/${contact._id}`)}
+                                                className="glass-card !p-3 cursor-pointer hover:shadow-md transition-all group border-l-2"
+                                                style={{ borderLeftColor: stage.color }}
+                                            >
+                                                <div className="font-semibold text-sm text-surface-900 dark:text-white truncate group-hover:text-primary-500 transition-colors">
+                                                    {contact.name || contact.email}
+                                                </div>
+                                                <div className="text-[10px] text-surface-400 truncate mt-0.5">{contact.company || 'No company'}</div>
+                                                
+                                                <div className="mt-3 flex items-center justify-between text-[10px] text-surface-500 pt-2 border-t border-surface-100 dark:border-surface-800">
+                                                    <span>{contact.emailCount || 0} emails</span>
+                                                    {contact.lastEmailed && (
+                                                        <span>{new Date(contact.lastEmailed).toLocaleDateString()}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
             {/* === TAB: Recipients === */}
             {activeTab === 'recipients' && (
                 <div className="space-y-4">
@@ -817,34 +953,43 @@ export default function CampaignDetail() {
                             <h3 className="text-lg font-semibold text-surface-900 dark:text-white">
                                 Recipients ({recipients.length})
                             </h3>
-                            {isEditable && (
-                                <button onClick={() => setShowAddRecipients(!showAddRecipients)} className="btn-primary !py-2">
-                                    <Plus className="w-4 h-4" /> Add from Contacts
-                                </button>
-                            )}
+                            {/* Removed isEditable restriction here so we can always add recipients */}
+                            <button onClick={() => setShowAddRecipients(!showAddRecipients)} className="btn-primary !py-2">
+                                <Plus className="w-4 h-4" /> Add Contacts
+                            </button>
                         </div>
 
                         {/* Add recipients panel */}
                         {showAddRecipients && (
                             <div className="mb-4 p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl border border-surface-200 dark:border-surface-700 animate-in">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <input value={recipientSearch} onChange={e => setRecipientSearch(e.target.value)}
-                                        className="input flex-1" placeholder="Search contacts by name or email..." autoFocus />
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                                    <div className="md:col-span-2">
+                                        <input value={recipientSearch} onChange={e => setRecipientSearch(e.target.value)}
+                                            className="input w-full" placeholder="Search name or email..." autoFocus />
+                                    </div>
+                                    <div>
+                                        <select value={filterSource} onChange={e => setFilterSource(e.target.value)} className="input w-full">
+                                            <option value="">All Sources</option>
+                                            {availableSources.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} className="input w-full !text-xs !px-2" title="Start Date" />
+                                        <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} className="input w-full !text-xs !px-2" title="End Date" />
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center mb-3">
+                                    <span className="text-sm font-medium text-surface-600 dark:text-surface-400">
+                                        {filteredContacts.length} contacts match filters
+                                    </span>
                                     {filteredContacts.length > 0 && (
-                                        <button onClick={() => {
-                                            const newRecipients = filteredContacts.map(c => ({
-                                                contactId: c._id,
-                                                email: c.email,
-                                                name: c.name || '',
-                                                company: c.company || '',
-                                                status: 'pending',
-                                            }));
-                                            setRecipients([...recipients, ...newRecipients]);
-                                            toast.success(`${newRecipients.length} contacts added!`);
-                                            setShowAddRecipients(false);
-                                            setRecipientSearch('');
-                                        }} className="btn-secondary !py-2 whitespace-nowrap">
-                                            <Users className="w-4 h-4" /> Add All ({filteredContacts.length})
+                                        <button 
+                                            onClick={() => handleAddSelectedContacts(filteredContacts)} 
+                                            disabled={addingLeads}
+                                            className="btn-secondary !py-2 whitespace-nowrap"
+                                        >
+                                            {addingLeads ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />} 
+                                            Add All Matched ({filteredContacts.length})
                                         </button>
                                     )}
                                 </div>
@@ -852,7 +997,7 @@ export default function CampaignDetail() {
                                     {filteredContacts.length === 0 ? (
                                         <p className="text-sm text-surface-400 text-center py-3">No contacts found</p>
                                     ) : filteredContacts.slice(0, 50).map(c => (
-                                        <button key={c._id} onClick={() => addRecipient(c)}
+                                        <button key={c._id} onClick={() => handleAddSelectedContacts([c])} disabled={addingLeads}
                                             className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 transition-all text-left">
                                             <div>
                                                 <span className="text-sm font-medium text-surface-900 dark:text-white">{c.name || c.email}</span>

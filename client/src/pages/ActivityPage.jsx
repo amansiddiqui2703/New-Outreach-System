@@ -19,7 +19,7 @@ const ACTIVITY_CONFIG = {
     task_completed: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-500/10', label: 'Task Completed' },
     team_invite: { icon: UserPlus, color: 'text-pink-500', bg: 'bg-pink-50 dark:bg-pink-500/10', label: 'Team Invite' },
     team_join: { icon: Users, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-500/10', label: 'Team Join' },
-    project_created: { icon: FolderOpen, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-500/10', label: 'Project Created' },
+
     note_added: { icon: FileText, color: 'text-teal-500', bg: 'bg-teal-50 dark:bg-teal-500/10', label: 'Note Added' },
     template_created: { icon: FileText, color: 'text-violet-500', bg: 'bg-violet-50 dark:bg-violet-500/10', label: 'Template Created' },
 };
@@ -169,9 +169,6 @@ export default function ActivityPage() {
                                                         )}
                                                         {activity.contactId?.email && (
                                                             <span className="text-[10px] text-surface-400">👤 {activity.contactId.name || activity.contactId.email}</span>
-                                                        )}
-                                                        {activity.projectId?.name && (
-                                                            <span className="text-[10px] text-surface-400">📁 {activity.projectId.name}</span>
                                                         )}
                                                     </div>
                                                 </div>

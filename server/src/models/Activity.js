@@ -18,7 +18,7 @@ const activitySchema = new mongoose.Schema({
             'email_sent', 'email_opened', 'email_replied',
             'task_created', 'task_completed',
             'team_invite', 'team_join',
-            'project_created', 'note_added',
+            'note_added',
             'template_created',
         ],
         required: true,
@@ -32,7 +32,6 @@ const activitySchema = new mongoose.Schema({
     // References
     campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign' },
     contactId: { type: mongoose.Schema.Types.ObjectId, ref: 'Contact' },
-    projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
     taskId: { type: mongoose.Schema.Types.ObjectId, ref: 'Task' },
 }, {
     timestamps: true,

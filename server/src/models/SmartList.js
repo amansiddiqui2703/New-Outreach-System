@@ -20,9 +20,9 @@ const smartListSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
-    projectId: {
+    campaignId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Project',
+        ref: 'Campaign',
     },
     name: {
         type: String,

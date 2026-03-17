@@ -6,10 +6,7 @@ const linkSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
-    projectId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Project',
-    },
+
     contactId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Contact',
@@ -48,7 +45,7 @@ const linkSchema = new mongoose.Schema({
 });
 
 linkSchema.index({ userId: 1, status: 1 });
-linkSchema.index({ projectId: 1 });
+linkSchema.index({ campaignId: 1 });
 linkSchema.index({ contactId: 1 });
 
 const Link = mongoose.model('Link', linkSchema);

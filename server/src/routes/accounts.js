@@ -5,11 +5,12 @@ import { testScriptConnection } from '../services/gmailScript.js';
 import { getAuthUrl, getTokensFromCode, getGmailProfile } from '../services/gmailOAuth.js';
 import { verifyState } from '../utils/crypto.js';
 import env from '../config/env.js';
+import authorize from '../middleware/authorize.js';
 
 const router = Router();
 
 // Generate Google OAuth2 authorization URL
-router.get('/oauth/connect', auth, async (req, res) => {
+router.get('/oauth/connect', auth, authorize('admin', 'manager', 'user'), async (req, res) => {
     try {
         if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
             return res.status(500).json({ error: 'Google OAuth is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env' });
@@ -75,7 +76,7 @@ router.get('/oauth/callback', async (req, res) => {
 });
 
 // Connect Gmail via Google Apps Script
-router.post('/connect-script', auth, async (req, res) => {
+router.post('/connect-script', auth, authorize('admin', 'manager', 'user'), async (req, res) => {
     try {
         const { email, displayName, scriptUrl } = req.body;
 
@@ -138,7 +139,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // Update account settings
-router.patch('/:id', auth, async (req, res) => {
+router.patch('/:id', auth, authorize('admin', 'manager', 'user'), async (req, res) => {
     try {
         const { dailyLimit, isActive } = req.body;
         const account = await GmailAccount.findOne({ _id: req.params.id, userId: req.user.id });
@@ -155,7 +156,7 @@ router.patch('/:id', auth, async (req, res) => {
 });
 
 // Disconnect account
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, authorize('admin', 'manager', 'user'), async (req, res) => {
     try {
         await GmailAccount.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
         res.json({ message: 'Account disconnected' });

@@ -4,7 +4,8 @@ import toast from 'react-hot-toast';
 import {
     Inbox, Mail, Send, Star, StarOff, Clock, Eye, EyeOff,
     MessageSquare, RefreshCw, Search, ChevronDown, ChevronUp,
-    AlertCircle, ArrowLeft, Loader2, Play, Filter, MailOpen
+    AlertCircle, ArrowLeft, Loader2, Play, Filter, MailOpen,
+    TrendingUp as ChartLineUp
 } from 'lucide-react';
 
 const FILTERS = [
@@ -41,6 +42,9 @@ export default function InboxPage() {
     const [simulating, setSimulating] = useState(false);
     const [simForm, setSimForm] = useState({ from: '', subject: '', body: '' });
     const [showSimulate, setShowSimulate] = useState(false);
+    const [updatingStage, setUpdatingStage] = useState(false);
+
+    const PIPELINE_STAGES = ['Identified', 'Contacted', 'Replied', 'Negotiating', 'Link Secured', 'Lost'];
 
     useEffect(() => { fetchMessages(); }, [filter, search]);
 
@@ -104,6 +108,27 @@ export default function InboxPage() {
             toast.success(value ? 'Marked as needs reply' : 'Marked as resolved');
             fetchMessages();
         } catch { /* silent */ }
+    };
+
+    const handleStageChange = async (contactId, newStage) => {
+        if (!contactId) return toast.error('No contact associated with this thread');
+        setUpdatingStage(true);
+        try {
+            await api.patch(`/contacts/${contactId}/stage`, { pipelineStage: newStage });
+            toast.success(`Pipeline updated to ${newStage}`);
+            
+            // Update local state to reflect UI change immediately
+            if (selectedMsg && selectedMsg.contactId && typeof selectedMsg.contactId === 'object') {
+                setSelectedMsg({
+                    ...selectedMsg,
+                    contactId: { ...selectedMsg.contactId, pipelineStage: newStage }
+                });
+            }
+        } catch (err) {
+            toast.error('Failed to update pipeline stage');
+        } finally {
+            setUpdatingStage(false);
+        }
     };
 
     const handleSimulate = async () => {
@@ -263,7 +288,26 @@ export default function InboxPage() {
                                     {selectedMsg.campaignId && ` • Campaign: ${selectedMsg.campaignId.name}`}
                                 </p>
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-2">
+                                {selectedMsg.contactId && (
+                                    <div className="relative group">
+                                        <select 
+                                            value={selectedMsg.contactId?.pipelineStage || 'Identified'}
+                                            onChange={(e) => handleStageChange(selectedMsg.contactId._id, e.target.value)}
+                                            disabled={updatingStage}
+                                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg border-0 cursor-pointer appearance-none pr-8 transition-colors ${
+                                                selectedMsg.contactId?.pipelineStage === 'Link Secured' 
+                                                ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' 
+                                                : 'bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-300'
+                                            }`}
+                                        >
+                                            {PIPELINE_STAGES.map(stage => (
+                                                <option key={stage} value={stage}>{stage}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+                                    </div>
+                                )}
                                 <button
                                     onClick={() => toggleNeedsReply(selectedMsg._id, !selectedMsg.needsReply)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedMsg.needsReply

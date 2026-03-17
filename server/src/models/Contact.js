@@ -6,9 +6,9 @@ const contactSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
-    projectId: {
+    campaignId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Project',
+        ref: 'Campaign',
     },
     email: {
         type: String,
@@ -57,7 +57,7 @@ const contactSchema = new mongoose.Schema({
 });
 
 contactSchema.index({ userId: 1, email: 1 }, { unique: true });
-contactSchema.index({ userId: 1, projectId: 1, pipelineStage: 1 });
+contactSchema.index({ userId: 1, campaignId: 1, pipelineStage: 1 });
 contactSchema.index({ userId: 1, tags: 1 });
 
 const Contact = mongoose.model('Contact', contactSchema);

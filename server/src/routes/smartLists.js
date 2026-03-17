@@ -65,16 +65,16 @@ function buildContactFilter(userId, filters, matchType) {
 // List all smart lists
 router.get('/', auth, async (req, res) => {
     try {
-        const { projectId } = req.query;
+        const { campaignId } = req.query;
         const filter = { userId: req.user.id };
-        if (projectId) filter.projectId = projectId;
+        if (campaignId) filter.campaignId = campaignId;
 
         const lists = await SmartList.find(filter).sort({ updatedAt: -1 }).lean();
 
         // Get live counts
         const listsWithCounts = await Promise.all(lists.map(async (list) => {
             const contactFilter = buildContactFilter(req.user.id, list.filters, list.matchType);
-            if (list.projectId) contactFilter.projectId = list.projectId;
+            if (list.campaignId) contactFilter.campaignId = list.campaignId;
             const count = await Contact.countDocuments(contactFilter);
             return { ...list, cachedCount: count };
         }));
@@ -88,7 +88,7 @@ router.get('/', auth, async (req, res) => {
 // Create smart list
 router.post('/', auth, async (req, res) => {
     try {
-        const { name, description, color, icon, filters, matchType, projectId } = req.body;
+        const { name, description, color, icon, filters, matchType, campaignId } = req.body;
         if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
         if (!filters || !Array.isArray(filters) || filters.length === 0) {
             return res.status(400).json({ error: 'At least one filter is required' });
@@ -96,7 +96,7 @@ router.post('/', auth, async (req, res) => {
 
         const smartList = await SmartList.create({
             userId: req.user.id,
-            projectId,
+            campaignId,
             name: name.trim(),
             description: description || '',
             color: color || '#435AFF',
@@ -108,7 +108,7 @@ router.post('/', auth, async (req, res) => {
 
         // Get initial count
         const contactFilter = buildContactFilter(req.user.id, filters, matchType || 'all');
-        if (projectId) contactFilter.projectId = projectId;
+        if (campaignId) contactFilter.campaignId = campaignId;
         smartList.cachedCount = await Contact.countDocuments(contactFilter);
         await smartList.save();
 
@@ -126,7 +126,7 @@ router.get('/:id/contacts', auth, async (req, res) => {
         if (!list) return res.status(404).json({ error: 'Smart list not found' });
 
         const contactFilter = buildContactFilter(req.user.id, list.filters, list.matchType);
-        if (list.projectId) contactFilter.projectId = list.projectId;
+        if (list.campaignId) contactFilter.campaignId = list.campaignId;
 
         const [contacts, total] = await Promise.all([
             Contact.find(contactFilter)

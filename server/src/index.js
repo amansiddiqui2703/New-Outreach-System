@@ -40,6 +40,7 @@ import taskRoutes from './routes/tasks.js';
 import activityRoutes from './routes/activity.js';
 import inboxRoutes from './routes/inbox.js';
 import seoRoutes from './routes/seo.js';
+import sequenceRoutes from './routes/sequences.js';
 import { handleStripeWebhook } from './services/stripeWebhook.js';
 
 // Tracking & unsubscribe (public)
@@ -109,6 +110,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/inbox', inboxRoutes);
 app.use('/api/seo', seoRoutes);
+app.use('/api/sequences', sequenceRoutes);
 
 // Tracking routes (public, no auth)
 app.use('/t', trackingRoutes);

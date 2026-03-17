@@ -34,6 +34,9 @@ import ActivityPage from './pages/ActivityPage';
 import InboxPage from './pages/InboxPage';
 import SeoTools from './pages/SeoTools';
 
+import Sequences from './pages/Sequences';
+import Tools from './pages/Tools';
+
 function RootRoute() {
   const { isAuthenticated, loading } = useAuth();
   if (loading) {
@@ -67,20 +70,22 @@ export default function App() {
               <Route path="/compose" element={<Compose />} />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/contacts/:id" element={<ContactDetail />} />
+              <Route path="/sequences" element={<Sequences />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/projects/:id" element={<ProjectDetail />} />
+              <Route path="/inbox" element={<InboxPage />} />
+              <Route path="/tools" element={<Tools />} />
               <Route path="/finder" element={<EmailFinder />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/accounts" element={<Accounts />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/billing" element={<Billing />} />
               <Route path="/templates" element={<Templates />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/projects/:id" element={<ProjectDetail />} />
               <Route path="/smart-lists" element={<SmartLists />} />
               <Route path="/links" element={<Links />} />
               <Route path="/team" element={<TeamPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/activity" element={<ActivityPage />} />
-              <Route path="/inbox" element={<InboxPage />} />
               <Route path="/seo" element={<SeoTools />} />
               <Route path="/admin" element={<Admin />} />
             </Route>

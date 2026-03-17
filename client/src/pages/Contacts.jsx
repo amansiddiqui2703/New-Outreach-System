@@ -3,34 +3,48 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useDropzone } from 'react-dropzone';
 import toast from 'react-hot-toast';
-import { Plus, Upload, Download, Trash2, Search, Users, X } from 'lucide-react';
+import { Plus, Upload, Download, Trash2, Search, Users, X, Filter, Globe } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Contacts() {
     const navigate = useNavigate();
     const [contacts, setContacts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [sourceFilter, setSourceFilter] = useState('');
+    const [listFilter, setListFilter] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [activeTab, setActiveTab] = useState('contacts'); // 'contacts' | 'finders'
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [showAdd, setShowAdd] = useState(false);
-    const [form, setForm] = useState({ email: '', name: '', company: '' });
+    const [form, setForm] = useState({ email: '', name: '', company: '', source: 'manual', lists: '' });
 
     const fetchContacts = () => {
+        if (activeTab !== 'contacts') return;
         setLoading(true);
-        api.get('/contacts', { params: { page, search, limit: 50 } })
+        const params = { page, search, limit: 50 };
+        if (sourceFilter) params.source = sourceFilter;
+        if (listFilter) params.list = listFilter;
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+
+        api.get('/contacts', { params })
             .then(r => { setContacts(r.data.contacts); setTotal(r.data.total); })
             .catch(() => { })
             .finally(() => setLoading(false));
     };
 
-    useEffect(() => { fetchContacts(); }, [page, search]);
+    useEffect(() => { fetchContacts(); }, [page, search, sourceFilter, listFilter, startDate, endDate, activeTab]);
 
     const addContact = async () => {
         if (!form.email) return;
         try {
-            await api.post('/contacts', form);
+            const payload = { ...form, lists: form.lists ? [form.lists] : [] };
+            await api.post('/contacts', payload);
             toast.success('Contact added');
-            setForm({ email: '', name: '', company: '' });
+            setForm({ email: '', name: '', company: '', source: 'manual', lists: '' });
             setShowAdd(false);
             fetchContacts();
         } catch (e) { toast.error(e.response?.data?.error || 'Failed'); }
@@ -73,16 +87,55 @@ export default function Contacts() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-surface-900 dark:text-white">Contacts</h1>
-                    <p className="text-surface-500 mt-1">{total} total contacts</p>
+                    <h1 className="text-3xl font-bold text-surface-900 dark:text-white">Master Audience</h1>
+                    <p className="text-surface-500 mt-1">{total} total contacts in your CRM</p>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={exportCSV} className="btn-secondary"><Download className="w-4 h-4" /> Export</button>
-                    <button onClick={() => setShowAdd(true)} className="btn-primary"><Plus className="w-4 h-4" /> Add Contact</button>
-                </div>
+                {activeTab === 'contacts' && (
+                    <div className="flex gap-2">
+                        <button onClick={exportCSV} className="btn-secondary"><Download className="w-4 h-4" /> Export</button>
+                        <button onClick={() => setShowAdd(true)} className="btn-primary"><Plus className="w-4 h-4" /> Add Contact</button>
+                    </div>
+                )}
             </div>
 
-            {/* CSV Upload */}
+            {/* Tabs */}
+            <div className="flex items-center gap-6 border-b border-surface-200 dark:border-surface-800">
+                <button
+                    onClick={() => setActiveTab('contacts')}
+                    className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'contacts' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-surface-500 hover:text-surface-700'}`}
+                >
+                    All Contacts
+                </button>
+                <button
+                    onClick={() => setActiveTab('finders')}
+                    className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'finders' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-surface-500 hover:text-surface-700'}`}
+                >
+                    Lead Finders
+                </button>
+            </div>
+
+            {activeTab === 'finders' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in">
+                    <Link to="/finder" className="glass-card p-6 flex flex-col items-center text-center hover:border-primary-500 transition-colors group">
+                        <div className="w-16 h-16 bg-primary-50 dark:bg-primary-500/10 rounded-2xl flex items-center justify-center text-primary-500 mb-4 group-hover:scale-110 transition-transform">
+                            <Search className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-lg font-bold text-surface-900 dark:text-white">Website Email Extractor</h3>
+                        <p className="text-surface-500 text-sm mt-2">Automatically crawl websites to find decision-maker emails and bulk add them to your audience.</p>
+                    </Link>
+                    <Link to="/seo" className="glass-card p-6 flex flex-col items-center text-center hover:border-accent-500 transition-colors group">
+                        <div className="w-16 h-16 bg-accent-50 dark:bg-accent-500/10 rounded-2xl flex items-center justify-center text-accent-500 mb-4 group-hover:scale-110 transition-transform">
+                            <Globe className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-lg font-bold text-surface-900 dark:text-white">SEO Domain Checker</h3>
+                        <p className="text-surface-500 text-sm mt-2">Check Domain Authority and backlink stats before pitching specific blogs or journalists.</p>
+                    </Link>
+                </div>
+            )}
+
+            {activeTab === 'contacts' && (
+                <>
+                    {/* CSV Upload */}
             <div {...getRootProps()} className={`glass-card p-8 text-center cursor-pointer border-2 border-dashed transition-all ${isDragActive ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/5' : 'border-surface-300 dark:border-surface-600'}`}>
                 <input {...getInputProps()} />
                 <Upload className="w-8 h-8 text-surface-400 mx-auto mb-3" />
@@ -99,19 +152,36 @@ export default function Contacts() {
                         <h3 className="font-semibold text-surface-900 dark:text-white">Add Contact</h3>
                         <button onClick={() => setShowAdd(false)}><X className="w-4 h-4 text-surface-400" /></button>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="input" placeholder="Any email address" />
                         <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="input" placeholder="Name (optional)" />
                         <input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} className="input" placeholder="Company (optional)" />
+                        <input value={form.lists} onChange={e => setForm({ ...form, lists: e.target.value })} className="input" placeholder="List Name (e.g. SEO Leads)" />
                     </div>
                     <button onClick={addContact} className="btn-primary mt-4">Add Contact</button>
                 </div>
             )}
 
-            {/* Search */}
-            <div className="relative max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
-                <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search contacts..." className="input pl-10" />
+            {/* Advanced Filters */}
+            <div className="flex flex-wrap items-center gap-4 p-4 glass-card rounded-xl">
+                <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
+                    <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search name/email..." className="input pl-10 h-10 w-full" />
+                </div>
+                <select value={sourceFilter} onChange={e => { setSourceFilter(e.target.value); setPage(1); }} className="input h-10 w-auto">
+                    <option value="">All Sources</option>
+                    <option value="manual">Manual Entry</option>
+                    <option value="csv">CSV Upload</option>
+                    <option value="finder">Website Finder</option>
+                </select>
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-surface-500">From:</span>
+                    <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setPage(1); }} className="input h-10" />
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-surface-500">To:</span>
+                    <input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setPage(1); }} className="input h-10" />
+                </div>
             </div>
 
             {/* Table */}
@@ -162,6 +232,8 @@ export default function Contacts() {
                     <span className="px-4 py-2 text-sm text-surface-500">Page {page}</span>
                     <button disabled={contacts.length < 50} onClick={() => setPage(p => p + 1)} className="btn-secondary !text-sm">Next</button>
                 </div>
+            )}
+                </>
             )}
         </div>
     );

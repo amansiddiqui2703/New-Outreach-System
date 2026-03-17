@@ -31,6 +31,11 @@ const projectSchema = new mongoose.Schema({
             { name: 'Lost', color: '#EF4444', order: 5 },
         ],
     },
+    sequenceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Sequence',
+    },
+    targetLists: [String],
     stats: {
         contacts: { type: Number, default: 0 },
         campaigns: { type: Number, default: 0 },

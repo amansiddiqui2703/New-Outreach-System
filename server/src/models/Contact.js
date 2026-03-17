@@ -33,6 +33,7 @@ const contactSchema = new mongoose.Schema({
         enum: ['csv', 'manual', 'finder', 'api', 'extension'],
         default: 'manual',
     },
+    lists: [String],
     pipelineStage: { type: String, default: 'Identified' },
     pipelineStageMovedAt: { type: Date },
     assignedTo: {

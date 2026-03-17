@@ -11,48 +11,62 @@ const COLORS = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#EC4899'
 
 export default function Projects() {
     const [projects, setProjects] = useState([]);
+    const [sequences, setSequences] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
-    const [form, setForm] = useState({ name: '', description: '', color: '#3B82F6' });
+    const [form, setForm] = useState({ name: '', description: '', color: '#3B82F6', sequenceId: '', targetLists: '' });
     const [showArchived, setShowArchived] = useState(false);
     const [menuOpen, setMenuOpen] = useState(null);
 
-    const fetchProjects = () => {
-        api.get(`/projects?archived=${showArchived}`)
-            .then(res => setProjects(res.data))
-            .catch(() => toast.error('Failed to load projects'))
-            .finally(() => setLoading(false));
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [projRes, seqRes] = await Promise.all([
+                api.get(`/projects?archived=${showArchived}`),
+                api.get('/sequences')
+            ]);
+            setProjects(projRes.data);
+            setSequences(seqRes.data.sequences);
+        } catch (e) {
+            toast.error('Failed to load campaigns');
+        } finally {
+            setLoading(false);
+        }
     };
 
-    useEffect(() => { fetchProjects(); }, [showArchived]);
+    useEffect(() => { fetchData(); }, [showArchived]);
 
     const createProject = async (e) => {
         e.preventDefault();
         if (!form.name.trim()) return;
         try {
-            await api.post('/projects', form);
-            toast.success('Project created!');
+            const payload = {
+                ...form,
+                targetLists: form.targetLists ? form.targetLists.split(',').map(s => s.trim()) : []
+            };
+            await api.post('/projects', payload);
+            toast.success('Campaign created!');
             setShowCreate(false);
-            setForm({ name: '', description: '', color: '#3B82F6' });
-            fetchProjects();
-        } catch { toast.error('Failed to create project'); }
+            setForm({ name: '', description: '', color: '#3B82F6', sequenceId: '', targetLists: '' });
+            fetchData();
+        } catch { toast.error('Failed to create campaign'); }
     };
 
     const archiveProject = async (id) => {
         try {
             await api.patch(`/projects/${id}/archive`);
-            toast.success(showArchived ? 'Project restored' : 'Project archived');
-            fetchProjects();
+            toast.success(showArchived ? 'Campaign restored' : 'Campaign archived');
+            fetchData();
         } catch { toast.error('Failed'); }
         setMenuOpen(null);
     };
 
     const deleteProject = async (id) => {
-        if (!confirm('Delete this project? Contacts will be unlinked but not deleted.')) return;
+        if (!confirm('Delete this campaign? Contacts will be unlinked but not deleted.')) return;
         try {
             await api.delete(`/projects/${id}`);
-            toast.success('Project deleted');
-            fetchProjects();
+            toast.success('Campaign deleted');
+            fetchData();
         } catch { toast.error('Failed'); }
         setMenuOpen(null);
     };
@@ -70,8 +84,8 @@ export default function Projects() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-surface-900 dark:text-white">Projects</h1>
-                    <p className="text-surface-500 mt-1">Organize your outreach into separate workspaces</p>
+                    <h1 className="text-3xl font-bold text-surface-900 dark:text-white">Campaigns</h1>
+                    <p className="text-surface-500 mt-1">Manage your email outreach campaigns and workflows</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <button
@@ -82,7 +96,7 @@ export default function Projects() {
                         {showArchived ? 'Archived' : 'Show Archived'}
                     </button>
                     <button onClick={() => setShowCreate(true)} className="btn-primary">
-                        <Plus className="w-4 h-4" /> New Project
+                        <Plus className="w-4 h-4" /> New Campaign
                     </button>
                 </div>
             </div>
@@ -92,12 +106,12 @@ export default function Projects() {
                 <div className="glass-card p-16 text-center">
                     <FolderKanban className="w-16 h-16 text-surface-300 mx-auto mb-4" />
                     <h3 className="text-xl font-semibold text-surface-700 dark:text-surface-300 mb-2">
-                        {showArchived ? 'No archived projects' : 'No projects yet'}
+                        {showArchived ? 'No archived campaigns' : 'No campaigns yet'}
                     </h3>
-                    <p className="text-surface-400 mb-6">Create a project to organize your contacts and campaigns</p>
+                    <p className="text-surface-400 mb-6">Create a campaign to engage your audience and track responses</p>
                     {!showArchived && (
                         <button onClick={() => setShowCreate(true)} className="btn-primary">
-                            <Plus className="w-4 h-4" /> Create Your First Project
+                            <Plus className="w-4 h-4" /> Create Your First Campaign
                         </button>
                     )}
                 </div>
@@ -188,8 +202,23 @@ export default function Projects() {
                             <div>
                                 <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Description</label>
                                 <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
-                                    placeholder="What is this project about?" rows={3}
+                                    placeholder="Internal notes about this campaign" rows={3}
                                     className="input-field w-full resize-none" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Sequence</label>
+                                <select value={form.sequenceId} onChange={e => setForm({ ...form, sequenceId: e.target.value })} className="input-field w-full text-surface-900 dark:text-white bg-white dark:bg-surface-900">
+                                    <option value="">Select a Sequence (Optional)</option>
+                                    {sequences.map(seq => (
+                                        <option key={seq._id} value={seq._id}>{seq.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Target List</label>
+                                <input type="text" value={form.targetLists} onChange={e => setForm({ ...form, targetLists: e.target.value })}
+                                    placeholder="List Name (e.g. SEO Leads)"
+                                    className="input-field w-full" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Color</label>
@@ -203,7 +232,7 @@ export default function Projects() {
                             </div>
                             <div className="flex gap-3 pt-2">
                                 <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary flex-1">Cancel</button>
-                                <button type="submit" className="btn-primary flex-1">Create Project</button>
+                                <button type="submit" className="btn-primary flex-1">Create Campaign</button>
                             </div>
                         </form>
                     </div>

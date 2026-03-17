@@ -14,6 +14,7 @@ export default function ProjectDetail() {
     const [loading, setLoading] = useState(true);
     const [dragging, setDragging] = useState(null);
     const [dragOver, setDragOver] = useState(null);
+    const [launching, setLaunching] = useState(false);
 
     const fetchPipeline = () => {
         api.get(`/projects/${id}/pipeline`)
@@ -21,7 +22,7 @@ export default function ProjectDetail() {
                 setProject(res.data.project);
                 setColumns(res.data.columns);
             })
-            .catch(() => toast.error('Failed to load project'))
+            .catch(() => toast.error('Failed to load campaign'))
             .finally(() => setLoading(false));
     };
 
@@ -53,6 +54,19 @@ export default function ProjectDetail() {
         setDragOver(null);
     };
 
+    const handleLaunch = async () => {
+        if (!confirm('Are you sure you want to launch this campaign? This will start sending emails to the matched contacts.')) return;
+        setLaunching(true);
+        try {
+            const res = await api.post(`/projects/${id}/send`);
+            toast.success(res.data.message);
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Failed to launch campaign');
+        } finally {
+            setLaunching(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-96">
@@ -64,8 +78,8 @@ export default function ProjectDetail() {
     if (!project) {
         return (
             <div className="text-center py-20">
-                <p className="text-surface-500">Project not found</p>
-                <Link to="/projects" className="text-primary-500 hover:underline mt-2 inline-block">← Back to Projects</Link>
+                <p className="text-surface-500">Campaign not found</p>
+                <Link to="/projects" className="text-primary-500 hover:underline mt-2 inline-block">← Back to Campaigns</Link>
             </div>
         );
     }
@@ -95,6 +109,13 @@ export default function ProjectDetail() {
                         <Users className="w-4 h-4" />
                         <span className="font-semibold text-surface-700 dark:text-surface-300">{totalContacts}</span> contacts
                     </div>
+                    <button 
+                        onClick={handleLaunch} 
+                        disabled={launching}
+                        className="btn-primary"
+                    >
+                        {launching ? 'Launching...' : 'Launch Campaign'}
+                    </button>
                 </div>
             </div>
 

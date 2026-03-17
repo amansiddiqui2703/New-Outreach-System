@@ -11,7 +11,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 // List contacts
 router.get('/', auth, async (req, res) => {
     try {
-        const { page = 1, limit = 50, search, tag, source, projectId, pipelineStage } = req.query;
+        const { page = 1, limit = 50, search, tag, source, projectId, pipelineStage, list, startDate, endDate } = req.query;
         const filter = { userId: req.user.id };
         // SECURITY: Escape regex special characters to prevent ReDoS/NoSQL injection
         if (search) {
@@ -26,6 +26,12 @@ router.get('/', auth, async (req, res) => {
         if (source) filter.source = source;
         if (projectId) filter.projectId = projectId;
         if (pipelineStage) filter.pipelineStage = pipelineStage;
+        if (list) filter.lists = list;
+        if (startDate || endDate) {
+            filter.createdAt = {};
+            if (startDate) filter.createdAt.$gte = new Date(startDate);
+            if (endDate) filter.createdAt.$lte = new Date(endDate);
+        }
 
         const contacts = await Contact.find(filter)
             .sort({ createdAt: -1 })
@@ -49,6 +55,7 @@ router.get('/export', auth, async (req, res) => {
             name: c.name,
             company: c.company,
             source: c.source,
+            lists: (c.lists || []).join(';'),
             tags: (c.tags || []).join(';'),
         }));
 
@@ -61,9 +68,9 @@ router.get('/export', auth, async (req, res) => {
             return str;
         };
 
-        const headers = 'email,name,company,source,tags\n';
+        const headers = 'email,name,company,source,lists,tags\n';
         const rows = csvData.map(c =>
-            `${escapeCSV(c.email)},${escapeCSV(c.name)},${escapeCSV(c.company)},${escapeCSV(c.source)},${escapeCSV(c.tags)}`
+            `${escapeCSV(c.email)},${escapeCSV(c.name)},${escapeCSV(c.company)},${escapeCSV(c.source)},${escapeCSV(c.lists)},${escapeCSV(c.tags)}`
         ).join('\n');
 
         res.setHeader('Content-Type', 'text/csv');
@@ -77,15 +84,15 @@ router.get('/export', auth, async (req, res) => {
 // Create contact
 router.post('/', auth, async (req, res) => {
     try {
-        const { email, name, company, customFields, tags, projectId, website, phone, linkedIn, twitter, pipelineStage } = req.body;
+        const { email, name, company, customFields, tags, lists, projectId, website, phone, linkedIn, twitter, pipelineStage, source } = req.body;
         const cleanEmail = (email || '').trim().toLowerCase();
         if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
             return res.status(400).json({ error: 'Please enter a valid email address' });
         }
 
         const contact = new Contact({
-            userId: req.user.id, email: cleanEmail, name, company, customFields, tags,
-            source: 'manual', projectId, website, phone, linkedIn, twitter,
+            userId: req.user.id, email: cleanEmail, name, company, customFields, tags, lists,
+            source: source || 'manual', projectId, website, phone, linkedIn, twitter,
             pipelineStage: pipelineStage || 'Identified',
         });
         await contact.save();
@@ -264,11 +271,12 @@ router.get('/:id', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
     try {
         // SECURITY: Whitelist allowed fields instead of passing raw req.body
-        const { name, company, tags, customFields, projectId, pipelineStage, website, phone, linkedIn, twitter, assignedTo } = req.body;
+        const { name, company, tags, lists, customFields, projectId, pipelineStage, website, phone, linkedIn, twitter, assignedTo } = req.body;
         const update = {};
         if (name !== undefined) update.name = name;
         if (company !== undefined) update.company = company;
         if (tags !== undefined) update.tags = tags;
+        if (lists !== undefined) update.lists = lists;
         if (customFields !== undefined) update.customFields = customFields;
         if (projectId !== undefined) update.projectId = projectId || null;
         if (website !== undefined) update.website = website;
